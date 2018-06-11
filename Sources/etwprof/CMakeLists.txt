@@ -102,7 +102,7 @@ SET_PROPERTY(TARGET etwprof APPEND PROPERTY LINK_FLAGS "/guard:cf")	# There is n
 
 # Version
 SET(major_version 0)
-SET(minor_version 1)
+SET(minor_version 2)
 SET(patch_version 0)
 TARGET_COMPILE_DEFINITIONS(etwprof PRIVATE -DETWP_MAJOR_VERSION=${major_version} -DETWP_MINOR_VERSION=${minor_version} -DETWP_PATCH_VERSION=${patch_version})
 
