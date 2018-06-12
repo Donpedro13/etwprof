@@ -1,7 +1,7 @@
 Usage
 ==========
 
-Please see "Usage" in [README.md](../README.MD) first.
+Please see "Usage" on the [Readme page](../README.md) first.
 
 ```
 etwprof
@@ -32,7 +32,7 @@ Command line reference
 
 The following parameters might need further explanation:
 * `-t --target`  
-If you specify the executable's name (instead of the process ID), etwprof will fail if there are more than one instances of the target process.
+If you specify the executable's name (instead of the process ID), etwprof will fail if there are more than one instances of the target process running.
 * `-d --debug`  
 Provides even more verbose output than `-v --verbose`. Intermediate results are retained (e.g. the unmerged `.etl` output).
 * `--mflags`  
@@ -54,5 +54,5 @@ Examples
 ----------
 
 * `etwprof profile -t=notepad.exe -o=D:\temp\mytrace.etl`
-* `etwprof profile -t=17816 --outdir=%TMP% --compress=7z`
+* `etwprof profile -t=17816 --outdir=%TMP% --cswitch --compress=7z`
 * `etwprof profile -v --nologo -t=notepad.exe --outdir=D:\temp -m --rate=100`
