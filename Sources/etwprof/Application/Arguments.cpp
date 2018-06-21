@@ -429,7 +429,7 @@ bool SemaCompressionMode (const ApplicationRawArguments& parsedArgs, Application
 
 bool SemaSamplingRate (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
 {
-    if (pArgumentsOut->emulate) {
+    if (pArgumentsOut->emulate && parsedArgs.samplingRate) {
         LogFailedSema (L"Sampling rate is invalid in emulate mode!");
 
         return false;
@@ -458,6 +458,20 @@ bool SemaSamplingRate (const ApplicationRawArguments& parsedArgs, ApplicationArg
 
 bool SemaMinidump (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
 {
+    if (pArgumentsOut->emulate) {
+        if (parsedArgs.minidump) {
+            LogFailedSema (L"Minidump parameter is invalid in emulate mode!");
+
+            return false;
+        }
+
+        if (parsedArgs.minidumpFlags) {
+            LogFailedSema (L"Minidump flags parameter is invalid in emulate mode!");
+
+            return false;
+        }
+    }
+
     if (!parsedArgs.minidump && parsedArgs.minidumpFlags) {
         LogFailedSema (L"Minidump flags parameter requires --mdump/-m!");
 

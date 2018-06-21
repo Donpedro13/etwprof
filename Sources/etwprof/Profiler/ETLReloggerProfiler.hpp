@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "OS/Synchronization/CriticalSection.hpp"\
+#include "OS/Synchronization/CriticalSection.hpp"
 
 #include "Profiler/IProfiler.hpp"
 
@@ -21,10 +21,10 @@ public:
     using Flags = uint8_t;
 
     enum Options : Flags {
-        Default = 0b00,
-        RecordCSwitches = 0b01,     // Record context switch information
-        Compress = 0b10,            // Compress result ETL with ETW's built-in compression
-        Debug = 0b11                // Preserve intermediate ETL files
+        Default         = 0b000,
+        RecordCSwitches = 0b001,     // Record context switch information
+        Compress        = 0b010,     // Compress result ETL with ETW's built-in compression
+        Debug           = 0b100      // Preserve intermediate ETL files
     };
 
     ETLReloggerProfiler (const std::wstring& inputPath,

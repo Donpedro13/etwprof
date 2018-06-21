@@ -223,19 +223,24 @@ bool Application::DoProfile ()
                         L"Stopping profiling command");
     
     ProcessList::Process target;
+    HANDLE hTargetProcess = INVALID_HANDLE_VALUE;
     if (!m_args.emulate) {
         if (!GetTarget (&target))
             return false;
 
         Log (LogSeverity::Info, L"Found valid target: " + target.m_name + L" (" + std::to_wstring (target.m_PID) +
             L")");
+
+        // We open a HANDLE to the target process, lest it finishes and we profile an unintended process (this way Windows
+        //   will not reassign the PID of the process, if it happens to exit while we are in this function)
+        // We might use this HANDLE later to write a minidump, hence PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+        hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.m_PID);
     }
 
-    // We open a HANDLE to the target process, lest it finishes and we profile an unintended process (this way Windows
-    //   will not reassign the PID of the process, if it happens to exit while we are in this function)
-    // We might use this HANDLE later to write a minidump, hence PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
-    HANDLE hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.m_PID);
-    OnExit processHandleCloser = [&hTargetProcess]() { CloseHandle (hTargetProcess); };
+    OnExit processHandleCloser = [&hTargetProcess]() {
+        if (hTargetProcess != INVALID_HANDLE_VALUE)
+            CloseHandle (hTargetProcess);
+    };
 
     std::wstring finalOutputPath = m_args.output;
     // If the specified out path is a folder, we need to generate an appropriate file name, and append it to the output
@@ -306,7 +311,7 @@ bool Application::DoProfile ()
     }
 
     // Before starting profiling, write a minidump, if needed
-    if (m_args.minidump) {
+    if (m_args.minidump && ETWP_VERIFY (!m_args.emulate)) {
         std::wstring dumpPath = PathReplaceExtension (finalOutputPath, L".dmp");
         Log (LogSeverity::Info, L"Minidump path is " + dumpPath);
 
