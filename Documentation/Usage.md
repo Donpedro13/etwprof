@@ -56,3 +56,4 @@ Examples
 * `etwprof profile -t=notepad.exe -o=D:\temp\mytrace.etl`
 * `etwprof profile -t=17816 --outdir=%TMP% --cswitch --compress=7z`
 * `etwprof profile -v --nologo -t=notepad.exe --outdir=D:\temp -m --rate=100`
+* `etwprof profile @"D:\folder\some parameters.txt"`

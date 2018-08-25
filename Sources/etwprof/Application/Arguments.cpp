@@ -1,9 +1,13 @@
 #include "Arguments.hpp"
 
 #include "Application.hpp"
+
 #include "Log/Logging.hpp"
+
 #include "OS/FileSystem/Utility.hpp"
+
 #include "Utility/Asserts.hpp"
+#include "Utility/ResponseFile.hpp"
 
 // Note: Arguments are processed by our own hand-rolled logic. This has several
 //   advantages and disadvantages.
@@ -40,6 +44,11 @@ void LogFailedSema (const std::wstring& message)
     Log (LogSeverity::Warning, L"Argument error: " + message);
 }
 
+bool IsRespFileDirective (const std::wstring& str)
+{
+    return str.compare (0, 1, L"@") == 0;
+}
+
 bool IsArg (const std::wstring& str)
 {    
     ETWP_ASSERT (!str.empty ()); // Impossible
@@ -74,6 +83,13 @@ bool IsAssignmentArg (const std::wstring& arg)
     ETWP_ASSERT (IsArg (arg));
 
     return arg.find (L"=") != arg.npos;
+}
+
+std::wstring GetRespFilePathFromDirective (const std::wstring& directive)
+{
+    ETWP_ASSERT (IsRespFileDirective (directive));
+
+    return directive.substr (1);
 }
 
 std::wstring GetArgName (const std::wstring& arg)
@@ -488,6 +504,47 @@ bool SemaMinidump (const ApplicationRawArguments& parsedArgs, ApplicationArgumen
     return true;
 }
 
+bool UnpackRespFiles (const std::vector<std::wstring>& arguments, std::vector<std::wstring>* pArgumentsOut)
+{
+    std::vector<std::wstring> result = arguments;
+    for (std::vector<std::wstring>::size_type i = 0; i < result.size (); ++i) {
+        if (IsRespFileDirective (result[i])) {
+            std::wstring respFilePath = GetRespFilePathFromDirective (result[i]);
+
+            std::vector<std::wstring> respFileArgs;
+            try {
+                ResponseFile respFile (respFilePath);
+                std::wstring error;
+                if (!respFile.Unpack (&respFileArgs, &error)) {
+                    LogFailedParse (error);
+
+                    return false;
+                }
+            } catch (const ResponseFile::InitException& e) {
+                LogFailedParse (e.GetMsg ());
+
+                return false;
+            }
+
+            // Guard against "response file in response file" situation...
+            for (auto it = respFileArgs.cbegin (); it != respFileArgs.cend (); ++it) {
+                if (IsRespFileDirective (*it)) {
+                    LogFailedParse (L"Illegal nested response file directive (" + respFilePath + L")!");
+
+                    return false;
+                }
+            }
+
+            result.erase (result.begin () + i); // Far from efficient, but doesn't matter here...
+            result.insert (result.begin () + i, respFileArgs.begin (), respFileArgs.end ());
+        }
+    }
+
+    *pArgumentsOut = std::move (result);
+
+    return true;
+}
+
 }   // namespace
 
 bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawArguments* pArgumentsOut)
@@ -496,9 +553,14 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
 
     ScopeLogger logger (LogSeverity::Debug, L"Parsing arguments", L"Finished parsing arguments");
 
-    auto it = arguments.cbegin ();
+    // Handle response files (if any)
+    std::vector<std::wstring> finalArguments;
+    if (!UnpackRespFiles (arguments, &finalArguments))
+        return false;
+
+    auto it = finalArguments.cbegin ();
     ++it; // The first argument is expected to be the application path; skip it
-    if (it == arguments.cend ()) {
+    if (it == finalArguments.cend ()) {
         LogFailedParse (L"Not enough arguments!");
 
         return false;
@@ -520,7 +582,7 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
     }
 
     // Parse arguments
-    for (;it != arguments.cend (); ++it) {
+    for (;it != finalArguments.cend (); ++it) {
         Log (LogSeverity::Debug, L"Parsing argument: " + *it);
 
         if (IsCommand (*it)) {

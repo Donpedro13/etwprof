@@ -73,9 +73,12 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Asserts.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Macros.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/OnExit.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/OnExit.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Macros.hpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.cpp
+		)
 
 # 3rd party binaries that need to be copied to the configuration's binary directory
 SET(kerneltracecontrol_target_location
