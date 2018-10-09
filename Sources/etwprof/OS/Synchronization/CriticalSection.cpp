@@ -19,6 +19,11 @@ CriticalSection::CriticalSection (DWORD spinCount /*= 0*/)
     }
 }
 
+CriticalSection::~CriticalSection ()
+{
+    DeleteCriticalSection (&m_cs);
+}
+
 void CriticalSection::Lock ()
 {
     EnterCriticalSection (&m_cs);

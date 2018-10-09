@@ -12,6 +12,7 @@ public:
     ETWP_DISABLE_COPY_AND_MOVE (CriticalSection);
 
     explicit CriticalSection (DWORD spinCount = 0);
+    ~CriticalSection ();
 
     void Lock ();
     bool TryLock ();
