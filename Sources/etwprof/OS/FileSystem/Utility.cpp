@@ -57,6 +57,9 @@ bool IsFile (const std::wstring& path)
     if (ETWP_ERROR (attributes == INVALID_FILE_ATTRIBUTES))
         return false;
 
+    if ((attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        return false;
+
     return (attributes & kRegularFileFlags) != 0;
 }
 
