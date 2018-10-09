@@ -23,6 +23,24 @@ constexpr DWORD kRegularFileFlags = FILE_ATTRIBUTE_ARCHIVE 	            |
 
 }   // namespace
 
+std::wstring EncodingToString (Encoding encoding)
+{
+    switch (encoding) {
+        case Encoding::ACP:
+            return L"ACP";
+        case Encoding::UTF8:
+            return L"UTF8";
+        case Encoding::UTF16LE:
+            return L"UTF-16 LE";
+        case Encoding::UTF16BE:
+            return L"UTF-16 BE";
+        default:
+            ETWP_DEBUG_BREAK ();
+
+            return L"Unknown";
+    }
+}
+
 bool PathExists (const std::wstring& path)
 {
     // It would be more correct to call GetFileAttributesEx, check for failure,

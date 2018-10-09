@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "OS/FileSystem/Utility.hpp"
+
 #include "Utility/Exception.hpp"
 #include "Utility/Macros.hpp"
 
@@ -25,6 +27,8 @@ public:
     ~ResponseFile ();
 
     bool Unpack (std::vector<std::wstring>* pArgumentsOut, std::wstring* pErrorOut);
+
+    Encoding GetEncoding () const;
 
 private:
     std::unique_ptr<Impl::ResponseFileImpl> m_impl;

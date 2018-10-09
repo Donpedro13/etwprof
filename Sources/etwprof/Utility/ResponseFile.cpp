@@ -2,22 +2,22 @@
 
 #include <windows.h>
 
-#include "OS/FileSystem/Utility.hpp"
 #include "Utility/Asserts.hpp"
+#include "Utility/OnExit.hpp"
 
 namespace ETWP {
 
 namespace {
 
-const wchar_t kUTF16LEBOM = L'\xFEFF';
-const wchar_t kUTF16BEBOM = L'\xFFFE';
-const char    kUTF8BOM[]  = "\xEF\xBB\xBF";
+const wchar_t       kUTF16LEBOM = L'\xFEFF';
+const wchar_t       kUTF16BEBOM = L'\xFFFE';
+const unsigned char kUTF8BOM[] = { 0xEF, 0xBB, 0xBF };
 
 constexpr DWORD kUTF16BOMNBytes = sizeof (wchar_t);
-constexpr DWORD kUTF8BOMNBytes  = sizeof (kUTF8BOM) - sizeof '\0';
+constexpr DWORD kUTF8BOMNBytes  = sizeof (kUTF8BOM);
 
 constexpr size_t kMaxRespFileSize = 1'024 * 1'024;  // 1 MB
-constexpr size_t kMinRespFileSize = 2;    // e.g. "-m" w/ ASCII/UTF-8
+constexpr size_t kMinRespFileSize = 2;    // e.g. "-m" w/ ASCII or UTF-8
 
 }   // namespace
 
@@ -35,20 +35,18 @@ public:
 
     bool Unpack (std::vector<std::wstring>* pArgumentsOut, std::wstring* pErrorOut);
 
+    Encoding GetEncoding () const;
+
 private:
     HANDLE   m_hFile;
     LONGLONG m_fileSize;
 
+    Encoding m_encoding;
+    size_t   m_bomSize;
+
     std::wstring m_path;
 
-    std::unique_ptr<char> m_pRawContent;    // Raw content with \x00\x00 appended at the end
-
-    enum class Encoding {
-        ACP,
-        UTF8,
-        UTF16LE,
-        UTF16BE
-    };
+    std::unique_ptr<char[]> m_pRawContent;    // Raw content with \x00\x00 appended at the end
 
     bool IsValid (std::wstring* pErrorOut) const;
 
@@ -78,6 +76,8 @@ ResponseFileImpl::ResponseFileImpl (const std::wstring& filePath):
     if (m_hFile == INVALID_HANDLE_VALUE)
         throw InitException (L"Unable to open response file (" + filePath + L")!");
 
+    OnExit handleCloserOnException ([&]() { CloseHandle (m_hFile); });
+
     LARGE_INTEGER fileSize;
     if (ETWP_ERROR (GetFileSizeEx (m_hFile, &fileSize) == FALSE))
         throw InitException (L"Unable to determine file size of response file (" + filePath + L")!");
@@ -88,10 +88,14 @@ ResponseFileImpl::ResponseFileImpl (const std::wstring& filePath):
     if (!IsValid (&error))
         throw InitException (error);
 
+    // We might work with m_pRawContent cast to wchar_t* later
+    static_assert (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= alignof (wchar_t), "Unable to satisfy alignment requirement!");
+
     // We don't know the encoding of the file at this point, so we just slap a double null terminator (might be UTF-16)
     //   at the end...
     m_pRawContent.reset (new char[m_fileSize + sizeof L'\0']);
-    *reinterpret_cast<wchar_t*> (m_pRawContent.get () + m_fileSize) = L'\0';
+    m_pRawContent[m_fileSize] = '\0';
+    m_pRawContent[m_fileSize + 1] = '\0';
 
     DWORD bytesRead = 0;
     if (ReadFile (m_hFile, m_pRawContent.get (), static_cast<DWORD> (m_fileSize), &bytesRead, nullptr) == FALSE ||
@@ -99,6 +103,10 @@ ResponseFileImpl::ResponseFileImpl (const std::wstring& filePath):
     {
         throw InitException (L"Unable read contents of response file (" + filePath + L")!");
     }
+
+    m_encoding = GuessEncoding (&m_bomSize);
+
+    handleCloserOnException.Deactivate ();
 }
 
 ResponseFileImpl::~ResponseFileImpl ()
@@ -123,10 +131,11 @@ bool ResponseFileImpl::IsValid (std::wstring* pErrorOut) const
     return true;
 }
 
-ResponseFileImpl::Encoding ResponseFileImpl::GuessEncoding (size_t* pBOMSizeOut) const
+Encoding ResponseFileImpl::GuessEncoding (size_t* pBOMSizeOut) const
 {
     // Note: encoding blues. Even though the native encoding is UTF-16 on Windows, the "default" choice of both notepad
-    //   and WordPad is ANSI. Other popular text editors (Sublime Text, Notepad++, VS Code) will default to UTF-8 w/o BOM.
+    //   and WordPad is ANSI (ACP). Other popular text editors (Sublime Text, Notepad++, VS Code) will default to UTF-8
+    //   w/o BOM.
     //   Here's our "strategy": - In case of UTF-16, notepad/WordPad will place a BOM ==> we detect UTF-16 LE by the BOM
     //                          - If we detect a UTF-16 BE BOM, we back off
     //                          - If we detect a UTF-8 BOM ==> UTF-8 (obviously)
@@ -200,9 +209,19 @@ std::vector<std::wstring> ResponseFileImpl::UnpackUTF8 (size_t bytesToSkip) cons
 
 bool ResponseFileImpl::Unpack (std::vector<std::wstring>* pArgumentsOut, std::wstring* pErrorOut)
 {
-    // Guess encoding
-    size_t nBytesToSkip;
-    switch (GuessEncoding (&nBytesToSkip)) {
+    // If we detected UTF-16, the file size must be a multiple of sizeof(wchar_t)
+    switch (m_encoding) {
+        case Encoding::UTF16BE:
+        case Encoding::UTF16LE:
+            if (ETWP_ERROR ((m_fileSize % sizeof (wchar_t)) != 0)) {
+                *pErrorOut = L"UTF-16 response file detected, but file size (" + std::to_wstring (m_fileSize) +
+                    L" bytes) for file (" + m_path + L") is not a multiple of 2!";
+
+                return false;
+            }
+    }
+    
+    switch (m_encoding) {
         case Encoding::ACP:
             *pErrorOut = L"ANSI-encoded (ACP) response files are unsupported (" + m_path + L")!";
 
@@ -212,17 +231,22 @@ bool ResponseFileImpl::Unpack (std::vector<std::wstring>* pArgumentsOut, std::ws
 
             return false;
         case Encoding::UTF16LE:
-            *pArgumentsOut = UnpackUTF16LE (nBytesToSkip);
+            *pArgumentsOut = UnpackUTF16LE (m_bomSize);
 
             return true;
         case Encoding::UTF8:
-            *pArgumentsOut = UnpackUTF8 (nBytesToSkip);
+            *pArgumentsOut = UnpackUTF8 (m_bomSize);
 
             return true;
         default:
             ETWP_DEBUG_BREAK_STR (L"Impossible Encoding value!");
             return false;
     }
+}
+
+Encoding ResponseFileImpl::GetEncoding () const
+{
+    return m_encoding;
 }
 
 }   // namespace Impl
@@ -247,6 +271,11 @@ ResponseFile::~ResponseFile ()
 bool ResponseFile::Unpack (std::vector<std::wstring>* pArgumentsOut, std::wstring* pErrorOut)
 {
     return m_impl->Unpack (pArgumentsOut, pErrorOut);
+}
+
+Encoding ResponseFile::GetEncoding () const
+{
+    return m_impl->GetEncoding ();
 }
 
 }   // namespace ETWP

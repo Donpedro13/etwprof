@@ -5,6 +5,15 @@
 
 namespace ETWP {
 
+enum class Encoding {
+    ACP,
+    UTF8,
+    UTF16LE,
+    UTF16BE
+};
+
+std::wstring EncodingToString (Encoding encoding);
+
 bool PathExists (const std::wstring& path);
 // This function should work OK on UNC paths. In case of a network path
 //   however, the path is considered invalid, if the host does not exist.

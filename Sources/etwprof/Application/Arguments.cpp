@@ -511,9 +511,15 @@ bool UnpackRespFiles (const std::vector<std::wstring>& arguments, std::vector<st
         if (IsRespFileDirective (result[i])) {
             std::wstring respFilePath = GetRespFilePathFromDirective (result[i]);
 
+            Log (LogSeverity::Debug, L"Processing response file: " + respFilePath);
+
             std::vector<std::wstring> respFileArgs;
             try {
                 ResponseFile respFile (respFilePath);
+
+                Log (LogSeverity::Debug, L"Detected encoding for response file \"" + respFilePath +
+                    L"\" is: " + EncodingToString (respFile.GetEncoding ()));
+
                 std::wstring error;
                 if (!respFile.Unpack (&respFileArgs, &error)) {
                     LogFailedParse (error);
