@@ -237,10 +237,10 @@ bool Application::DoProfile ()
         hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.m_PID);
     }
 
-    OnExit processHandleCloser = [&hTargetProcess]() {
+    OnExit processHandleCloser ([&hTargetProcess]() {
         if (hTargetProcess != INVALID_HANDLE_VALUE)
             CloseHandle (hTargetProcess);
-    };
+    });
 
     std::wstring finalOutputPath = m_args.output;
     // If the specified out path is a folder, we need to generate an appropriate file name, and append it to the output
@@ -327,10 +327,10 @@ bool Application::DoProfile ()
         return false;
     }
 
-    OnExit consoleCtrlHandlerRemover = [] () {
+    OnExit consoleCtrlHandlerRemover ([] () {
         if (SetConsoleCtrlHandler (&Application::CtrlHandler, FALSE) == FALSE)
             Log (LogSeverity::Warning, L"Unable to remove Console Control Handler!");
-    };
+    });
 
     std::wstring startErrorMsg;
     if (!m_pProfiler->Start (&startErrorMsg)) {
@@ -559,7 +559,7 @@ bool Application::HandleArguments (const Application::ArgumentVector& arguments)
     LogSeverity prevLogSeverity = GetMinLogSeverity ();
     SetMinLogSeverity (LogSeverity::MostVerbose);
 
-    OnExit logSeverityRestorer = [&prevLogSeverity] () { SetMinLogSeverity (prevLogSeverity); };
+    OnExit logSeverityRestorer ([&prevLogSeverity] () { SetMinLogSeverity (prevLogSeverity); });
 #endif  // #ifdef ETWP_DEBUG
 
     ApplicationRawArguments rawArgs;

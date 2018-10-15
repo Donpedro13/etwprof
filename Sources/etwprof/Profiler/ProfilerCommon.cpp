@@ -214,7 +214,7 @@ bool MergeTrace (const std::wstring& inputETLPath,
 #ifndef ETWP_DEBUG
     // Do not display error dialog if DLL loading fails
     UINT prevErrorMode = SetErrorMode (SEM_FAILCRITICALERRORS);
-    OnExit errorModeRestorer = [&prevErrorMode] () { SetErrorMode (prevErrorMode); };
+    OnExit errorModeRestorer ([&prevErrorMode] () { SetErrorMode (prevErrorMode); });
 #endif  // #ifndef ETWP_DEBUG
 
     HMODULE kernelTraceControlDLL = LoadLibraryW (L"kerneltracecontrol.dll");

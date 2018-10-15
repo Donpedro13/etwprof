@@ -46,7 +46,7 @@ bool CreateProcessSynchronous (const std::wstring& processPath,
     if (hDevNull == INVALID_HANDLE_VALUE)
         return false;
 
-    OnExit devNullHandleCloser = [&hDevNull]() { CloseHandle (hDevNull); };
+    OnExit devNullHandleCloser ([&hDevNull]() { CloseHandle (hDevNull); });
 
     startupInfo.hStdOutput = hDevNull;
     startupInfo.hStdError = hDevNull;
@@ -71,7 +71,7 @@ bool CreateProcessSynchronous (const std::wstring& processPath,
 
     CloseHandle (processInfo.hThread);
 
-    OnExit processHandleCloser = [&processInfo] () { CloseHandle (processInfo.hProcess); };
+    OnExit processHandleCloser ([&processInfo] () { CloseHandle (processInfo.hProcess); });
 
     // Wait for the process to finish
     bool success = false;
@@ -118,7 +118,7 @@ bool AddProfilePrivilegeToProcessToken ()
     if (ETWP_ERROR (OpenProcessToken (GetCurrentProcess (), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken) == FALSE))
         return false;
 
-    OnExit handleGuard = [&hToken]() { CloseHandle (hToken); };
+    OnExit handleGuard ([&hToken]() { CloseHandle (hToken); });
 
     std::unique_ptr<char[]> pMem (new char[sizeof (TOKEN_PRIVILEGES) + sizeof (LUID_AND_ATTRIBUTES)]);
     PTOKEN_PRIVILEGES privileges = reinterpret_cast<PTOKEN_PRIVILEGES> (pMem.get ());
@@ -142,7 +142,7 @@ bool IsProfilePrivilegePresentInToken (bool* pResultOut)
     if (ETWP_ERROR (OpenProcessToken (GetCurrentProcess (), TOKEN_QUERY, &hToken) == FALSE))
         return false;
 
-    OnExit handleGuard = [&hToken]() { CloseHandle (hToken); };
+    OnExit handleGuard ([&hToken]() { CloseHandle (hToken); });
 
     PRIVILEGE_SET privileges;
     privileges.PrivilegeCount = 1;

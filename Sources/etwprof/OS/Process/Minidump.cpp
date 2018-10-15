@@ -34,10 +34,10 @@ const HANDLE kDbgHelpHandle = reinterpret_cast<HANDLE> (0x1);
         return false;
     }
 
-    OnExit handleCloser = [&hMinidump]() { CloseHandle (hMinidump); };
+    OnExit handleCloser ([&hMinidump]() { CloseHandle (hMinidump); });
 
     SymInitializeW (kDbgHelpHandle, L"", FALSE);
-    OnExit dbgHelpUninitializer = []() { SymCleanup (kDbgHelpHandle); };
+    OnExit dbgHelpUninitializer ([]() { SymCleanup (kDbgHelpHandle); });
 	
 	BOOL result = MiniDumpWriteDump (hProcess,
 									 processPID,
