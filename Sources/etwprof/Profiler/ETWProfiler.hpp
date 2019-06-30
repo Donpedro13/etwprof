@@ -5,8 +5,9 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "IProfiler.hpp"
+#include "IETWBasedProfiler.hpp"
 
 #include "OS/ETW/ETWSessionInterfaces.hpp"
 #include "OS/Synchronization/CriticalSection.hpp"
@@ -20,7 +21,7 @@ class TraceRelogger;
 
 // Thread-safe class (except when stated otherwise) that can profile a process
 //   using ETW
-class ETWProfiler final : public IProfiler {
+class ETWProfiler final : public IETWBasedProfiler {
 public:
     // Meaning of ResultCode values:
     //   Unstarted      ->  Initialized, but not started yet
@@ -30,19 +31,10 @@ public:
     //   Aborted        ->  Profiling was stopped due to an unexpected condition
     //   Error          ->  Profiling stopped because of an error
 
-    using Flags = uint8_t;
-
-    enum Options : Flags {
-        Default         = 0b000,     
-        RecordCSwitches = 0b001,     // Record context switch information
-        Compress        = 0b010,     // Compress result ETL with ETW's built-in compression
-        Debug           = 0b100      // Preserve intermediate ETL files
-    };
-
     ETWProfiler (const std::wstring& outputPath,
                  DWORD target,
                  const ProfileRate& samplingRate,
-                 Flags options);
+                 IETWBasedProfiler::Flags options);
     virtual ~ETWProfiler () override;
 
     virtual bool Start (std::wstring* pErrorOut) override;
@@ -51,7 +43,11 @@ public:
 
     virtual bool IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut) override;
 
+    virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
+
 private:
+    using ProviderInfos = std::vector<IETWBasedProfiler::ProviderInfo>;
+
     // We need two locks to avoid deadlocks (consider: the profiler is being stopped from thread A, then the profiler
     //   thread B fails stopping with an error (e.g. trace merge fails), but needs to lock the lock to do so.
     //   Since stopping waits for the profiling thread synchronously, this kind of situation cannot be handled without
@@ -63,12 +59,15 @@ private:
 
     HANDLE m_hTargetProcess;
     HANDLE m_hWorkerThread;
+
     std::unique_ptr<IKernelETWSession> m_ETWSession;
 
-    DWORD        m_targetPID;
-    ProfileRate  m_samplingRate;
-    Options      m_options;
-    std::wstring m_outputPath;
+    DWORD                      m_targetPID;
+    ProviderInfos              m_userProviders;
+
+    ProfileRate                m_samplingRate;
+    IETWBasedProfiler::Options m_options;
+    std::wstring               m_outputPath;
 
     bool m_profiling;
 

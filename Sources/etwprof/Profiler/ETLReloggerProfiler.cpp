@@ -18,10 +18,11 @@ namespace ETWP {
 ETLReloggerProfiler::ETLReloggerProfiler (const std::wstring& inputPath,
                                           const std::wstring& outputPath,
                                           DWORD target,
-                                          Flags options):
+                                          IETWBasedProfiler::Flags options):
     m_lock (),
     m_hWorkerThread (nullptr),
     m_targetPID (target),
+    m_userProviders (),
     m_inputPath (inputPath),
     m_outputPath (outputPath),
     m_profiling (false),
@@ -161,6 +162,13 @@ bool ETLReloggerProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErr
     return !m_profiling;
 }
 
+bool ETLReloggerProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo)
+{
+    m_userProviders.push_back (providerInfo);
+
+    return true;
+}
+
 void ETLReloggerProfiler::StopImpl ()
 {
     if (ETWP_ERROR (!m_profiling))
@@ -203,7 +211,7 @@ void ETLReloggerProfiler::Profile ()
     LockableGuard<CriticalSection> lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
-    ProfileFilterData filterData = { {}, m_targetPID, bool (m_options & RecordCSwitches) };
+    ProfileFilterData filterData = { {}, {m_userProviders.begin (), m_userProviders.end () } , m_targetPID, bool (m_options & RecordCSwitches) };
 
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;

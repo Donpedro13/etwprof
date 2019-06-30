@@ -20,11 +20,11 @@
     #define ETWP_DEBUG_ONLY(stmt) stmt
     #define ETWP_ASSERT(expr)                                                  \
         if (!(expr))                                                           \
-            Impl::Assertion (L#expr, false, ETWP_WFILE, __LINE__)
+            ETWP::Impl::Assertion (L#expr, false, ETWP_WFILE, __LINE__)
     #define ETWP_ERROR(expr) ((expr) ?                                         \
-                Impl::Assertion (L#expr, true, ETWP_WFILE, __LINE__) : false)
+                ETWP::Impl::Assertion (L#expr, true, ETWP_WFILE, __LINE__) : false)
     #define ETWP_VERIFY(expr) (!(expr) ?                                       \
-                Impl::Assertion (L#expr, false, ETWP_WFILE, __LINE__) : true)
+                ETWP::Impl::Assertion (L#expr, false, ETWP_WFILE, __LINE__) : true)
 #endif  // #ifdef ETWP_RELEASE
 
 namespace ETWP {

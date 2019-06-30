@@ -32,11 +32,11 @@ bool Win7KernelSession::Start ()
         return true;
 
     // On Windows 7, there can only be one kernel logger, and with a fixed name (KERNEL_LOGGER_NAMEW)
-    m_started = StartETWSession (KERNEL_LOGGER_NAMEW,
-                                 EVENT_TRACE_REAL_TIME_MODE,
-                                 m_flags,
-                                 &m_handle,
-                                 &m_properties);
+    m_started = StartRealTimeETWSession (KERNEL_LOGGER_NAMEW,
+                                         EVENT_TRACE_REAL_TIME_MODE,
+                                         m_flags,
+                                         &m_handle,
+                                         &m_properties);
 
     return m_started;
 }

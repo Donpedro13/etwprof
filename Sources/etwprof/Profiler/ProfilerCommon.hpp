@@ -6,13 +6,28 @@
 #include <string>
 #include <unordered_set>
 
+#include "IETWBasedProfiler.hpp"
+
 struct ITraceEvent;
 class TraceRelogger;
+
+template<>
+struct std::hash<ETWP::IETWBasedProfiler::ProviderInfo> {
+    std::size_t operator() (const ETWP::IETWBasedProfiler::ProviderInfo& providerInfo) const {
+        const GUID& guid = providerInfo.providerID;
+        // According to my experiments (with GUIDs generated with CoCreateGuid), Data1-3 used as a hash value provides
+        //   significantly better uniformity than Data4. I'm not sure why, and haven't bothered to investigate
+        return *reinterpret_cast<const std::size_t*> (&guid.Data1);
+    }
+};
 
 namespace ETWP {
 
 struct ProfileFilterData {
     std::unordered_set<DWORD> threads;
+    // In theory, std::vector should perform better if the number of providers is small. However, my experiments showed
+    //   only a very tiny difference, so using a hash set alone should suffice
+    std::unordered_set<IETWBasedProfiler::ProviderInfo> userProviders;
     DWORD targetPID;
     bool  cswitch;
 };

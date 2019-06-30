@@ -4,10 +4,16 @@
 
 #include "Log/Logging.hpp"
 
+#include "OS/ETW/Utils.hpp"
+
 #include "OS/FileSystem/Utility.hpp"
 
+#include "OS/Version/WinVersion.hpp"
+
 #include "Utility/Asserts.hpp"
+#include "Utility/GUID.hpp"
 #include "Utility/ResponseFile.hpp"
+#include "Utility/StringUtils.hpp"
 
 // Note: Arguments are processed by our own hand-rolled logic. This has several
 //   advantages and disadvantages.
@@ -225,6 +231,11 @@ bool ParseLongAssignmentArg (const std::wstring& arg, ApplicationRawArguments* p
     } else if (argName == L"mflags") {
         pArgumentsOut->minidumpFlags = true;
         pArgumentsOut->minidumpFlagsValue = GetArgValue (arg);
+
+        return true;
+    } else if (argName == L"enable") {
+        pArgumentsOut->userProviders = true;
+        pArgumentsOut->userProvidersValue = GetArgValue (arg);
 
         return true;
     }
@@ -504,6 +515,245 @@ bool SemaMinidump (const ApplicationRawArguments& parsedArgs, ApplicationArgumen
     return true;
 }
 
+enum class UserProviderInfoVersion {    // I expect the format to be evolving, but I'd also like backward compatibility
+    One,
+    Unknown
+};
+
+UserProviderInfoVersion DetermineUserProviderInfoVersion (const std::wstring& /*string*/)
+{
+    return UserProviderInfoVersion::One;    // Only one version as of now...
+}
+
+bool SemaProviderInfoPart (const std::wstring& part, ApplicationArguments::UserProviderInfo* pProviderInfoOut)
+{
+    if (part.empty ()) {
+        LogFailedSema (L"Invalid user provider descriptor (empty part encountered)!");
+
+        return false;
+    }
+
+    // Split the part by colons
+    std::vector<std::wstring> elements = SplitString (part, L':');
+    std::wstring& providerID = elements[0];
+    if (providerID.empty ()) {
+        LogFailedSema (L"User provider name/GUID cannot be empty!");
+
+        return false;
+    }
+
+    // Determine the type of provider ID, validate, etc.
+    // Also check if the provider is registered. The logic we follow here is the same as xperf's (which is quite
+    //   intuitive BTW):
+    //   - in case of a registered name, the provider *must* be registered
+    //   - in case of a dynamic name (*whatever), the provider is most likely a TraceLogging provider (not registered)
+    //   - in case of a GUID, the provider might be either registered or not (e.g. TraceLogging provider)
+    ApplicationArguments::UserProviderInfo result;
+    if (IsGUID (providerID)) {
+        result.type = ApplicationArguments::UserProviderInfo::GUID;
+        if (ETWP_ERROR (!StringToGUID (providerID, &result.guid))) {
+            LogFailedSema (L"Invalid user provider GUID!");
+
+            return false;
+        }
+
+        // Try to look up a registered name for this GUID
+        std::wstring providerName;
+        GetNameOfRegisteredProvider (result.guid, &providerName);
+        if (!providerName.empty ()) {
+            Log (LogSeverity::Info, L"Found registered name for GUID \"" + providerID + L"\": \"" + providerName + L"\"");
+
+            result.name = providerName;
+        }
+
+        std::wstring logString = L"Provider \"" + providerID + L"\" is ";
+        if (!IsProviderRegistered (result.guid))
+            logString += L"not ";
+
+        logString += L"registered";
+
+        Log (LogSeverity::Info, logString);
+    } else if (providerID[0] == L'*') {
+        result.type = ApplicationArguments::UserProviderInfo::DynamicName;
+
+        providerID.erase (0, 1);
+        result.name = providerID;
+
+        if (ETWP_ERROR (!InferGUIDFromProviderName (result.name, &result.guid))) {
+            LogFailedSema (L"Unable to infer provider GUID from name \"" + result.name + L"\"!");
+
+            return false;
+        }
+
+        std::wstring guidString;
+        if (GUIDToString (result.guid, &guidString))
+            Log (LogSeverity::Info, L"GUID inferred from name \"" + result.name + L"\": " + guidString);
+
+        std::wstring logString = L"Provider with dynamic name \"" + result.name + L"\" is ";
+        if (!IsProviderRegistered (result.guid))
+            logString += L"not ";
+
+        logString += L"registered";
+
+        Log (LogSeverity::Info, logString);
+    } else {
+        result.type = ApplicationArguments::UserProviderInfo::RegisteredName;
+        result.name = providerID;
+
+        if (!IsProviderRegistered (providerID)) {
+            LogFailedSema (L"Provider \"" + result.name + L"\" is not registered!");
+
+            return false;
+        }
+
+        if (ETWP_ERROR (!GetGUIDOfRegisteredProvider (result.name, &result.guid))) {
+            LogFailedSema (L"Unable to query GUID of registered provider \"" + result.name + L"\"!");
+
+            return false;
+        }
+
+        // A bit redundant because "registered names" *must* be registered
+        Log (LogSeverity::Info, L"Provider \"" + result.name + L"\" is registered");
+    }
+
+    const size_t size = elements.size ();
+    if (size > 3) { // There must be to colons at maximum
+        LogFailedSema (L"Too many colons in user provider descriptor!");
+
+        return false;
+    }
+
+    if (size >= 2) { // At least one colon -> provider name + keyword bitmask might be present
+        const std::wstring& keywordBitmaskStr = elements[1];
+        if (!keywordBitmaskStr.empty ()) {
+            uint64_t keywordBitmask;
+            if (keywordBitmaskStr[0] == L'~')
+                keywordBitmask = ~_wcstoui64 (keywordBitmaskStr.substr (1).c_str (), nullptr, 0);
+            else
+                keywordBitmask = _wcstoui64 (keywordBitmaskStr.c_str (), nullptr, 0);
+
+            if (keywordBitmask == 0) {
+                LogFailedSema (L"Invalid Keyword bitmask (" + keywordBitmaskStr + L")!");
+
+                return false;
+            }
+
+            result.keywordBitmask = keywordBitmask;
+        }
+    }
+
+    if (size == 3) { // Two colons -> provider name + keyword bitmask + max. level, and potentially 'stack' at the end
+        // Do we have 'stack' at the end?
+        std::vector<std::wstring> trailingParts = SplitString (elements[2], L'\'');
+        if (trailingParts.size () != 3 && trailingParts.size () != 1) {   // e.g. NOT like 0x3'stack' and NOT like 0x3
+            LogFailedSema (L"Invalid user provider descriptor trailing \"" + elements[2] + L"\"!");
+
+            return false;
+        }
+
+        if (trailingParts.size () >= 1) {   // e.g. 0x3, or 0x3'stack'
+            const std::wstring& maxLevelStr = trailingParts[0];
+            if (!maxLevelStr.empty ()) {
+                unsigned long maxLevel = wcstoul (maxLevelStr.c_str (), nullptr, 0);
+                if (maxLevel == 0) {
+                    LogFailedSema (L"Invalid max. Level (" + maxLevelStr + L")!");
+
+                    return false;
+                }
+
+                result.maxLevel = static_cast<UCHAR> (maxLevel);
+            }
+        }
+
+        if (trailingParts.size () == 3) {    // e.g. 0x3'stack'
+            if (trailingParts[1] != L"stack") {
+                LogFailedSema (L"Invalid string in user provider descriptor trailing \"" + trailingParts[1] + L"\"!");
+
+                return false;
+            }
+
+            result.stack = true;
+        }
+    }
+
+    *pProviderInfoOut = result;
+
+    return true;
+}
+
+bool ChekForDuplicateProviders (const std::vector<ApplicationArguments::UserProviderInfo>& providerInfos)
+{
+    std::vector<GUID> guids;
+    for (auto&& providerInfo : providerInfos) {
+        // Ugly, inefficient (O(n^2)) way, but doesn't require us to either implement operator< for GUIDs, or introduce
+        //   our own GUID class
+        for (auto&& guid : guids) {
+            if (providerInfo.guid == guid) {  // Duplicate found
+                std::wstring providerID;
+                if (providerInfo.name.empty ())
+                    ETWP_VERIFY (GUIDToString (providerInfo.guid, &providerID));
+                else
+                    providerID = providerInfo.name;
+
+                LogFailedSema (L"Provider \"" + providerID + L"\" is specified more than once!");
+
+                return false;
+            }
+        }
+
+        guids.push_back (providerInfo.guid);
+    }
+
+    return true;
+}
+
+bool SemaUserProviderInfosVersionOne (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
+{
+    // Split string by '+' characters (multiple "entries" are separated with plus signs)
+    std::vector<std::wstring> parts = SplitString (parsedArgs.userProvidersValue, L'+');
+
+    // Some valid examples:
+    //   - SomeProvider
+    //   - SomeProvider::
+    //   - SomeProvider::'stack'
+    //   - 401AD6CA-8540-4340-8F1C-3BF0A736437D:~0x4:'stack'
+    //   - *FunkyName::0x3'stack'
+    for (auto&& part : parts) {
+        ApplicationArguments::UserProviderInfo providerInfo;
+        if (SemaProviderInfoPart (part, &providerInfo))
+            pArgumentsOut->userProviderInfos.push_back (providerInfo);
+        else
+            return false;
+    }
+
+    // After we have finished analyzing all user provider descriptors, let's see if there are more than one descriptor
+    //   referring to the same provider (illegal)
+    return ChekForDuplicateProviders (pArgumentsOut->userProviderInfos);
+}
+
+bool SemaUserProviderInfos (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
+{
+    if (!parsedArgs.userProviders)
+        return true;
+
+    // User providers are supported on Win8+ only
+    if (GetWinVersion () < BaseWinVersion::Win8) {
+        Log (LogSeverity::Warning,
+             L"User providers are supported on Windows 8 and later only! Events from these providers will not be collected!");
+
+        return true;
+    }
+
+    switch (DetermineUserProviderInfoVersion (parsedArgs.userProvidersValue)) {
+        case UserProviderInfoVersion::One:
+            return SemaUserProviderInfosVersionOne (parsedArgs, pArgumentsOut);
+        default:
+            ETWP_DEBUG_BREAK_STR (L"Invalid UserProviderInfoVersion!");
+
+            return false;
+    }
+}
+
 bool UnpackRespFiles (const std::vector<std::wstring>& arguments, std::vector<std::wstring>* pArgumentsOut)
 {
     std::vector<std::wstring> result = arguments;
@@ -650,6 +900,9 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
 
         if (!SemaMinidump (parsedArgs, pArgumentsOut))
             return false;
+
+        if (!SemaUserProviderInfos (parsedArgs, pArgumentsOut))
+            return false;
     } else {    // Not profiling
         if (parsedArgs.target) {
             LogFailedSema (L"Target parameter is only valid for profiling!");
@@ -689,6 +942,12 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
 
         if (parsedArgs.minidumpFlags) {
             LogFailedSema (L"Minidump flags parameter is only valid for profiling!");
+
+            return false;
+        }
+
+        if (parsedArgs.userProviders) {
+            LogFailedSema (L"User providers info parameter is only valid for profiling!");
 
             return false;
         }

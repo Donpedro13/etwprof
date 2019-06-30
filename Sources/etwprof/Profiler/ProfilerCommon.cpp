@@ -101,6 +101,11 @@ bool FilterImageLoadEvent (ProfileFilterData* pFilterData, void* pUserData)
                                                         //   kernel module loads (drivers, etc.)
 }
 
+bool FilterUserProviderEvent (ProfileFilterData* pFilterData, const GUID& eventGUID)
+{
+    return pFilterData->userProviders.find ({ eventGUID }) != pFilterData->userProviders.end ();
+}
+
 }   // namespace
 
 void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, void* context)
@@ -179,12 +184,13 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
 
         return;
     } else if (pHeader->ProcessId == pFilterData->targetPID) {
-        // Preserve miscellaneous events with the "general" PID matching
-        std::wstring errorMsg;
-        if (!pRelogger->Inject (pEvent, &errorMsg))
-            Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);
+        if (FilterUserProviderEvent (pFilterData, pEventRecord->EventHeader.ProviderId)) {
+            std::wstring errorMsg;
+            if (!pRelogger->Inject (pEvent, &errorMsg))
+                Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);
 
-        return;
+            return;
+        }
     }
 }
 

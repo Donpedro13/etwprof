@@ -10,7 +10,7 @@
 #include "OS/Process/ProcessList.hpp"
 #include "OS/Version/WinVersion.hpp"
 
-#include "Profiler/IProfiler.hpp"
+#include "Profiler/IETWBasedProfiler.hpp"
 
 #include "Utility/Macros.hpp"
 
@@ -31,7 +31,7 @@ public:
 private:
     ApplicationArguments m_args;
 
-    std::unique_ptr<IProfiler> m_pProfiler;
+    std::unique_ptr<IETWBasedProfiler> m_pProfiler;
 
     Application ();
     ~Application ();

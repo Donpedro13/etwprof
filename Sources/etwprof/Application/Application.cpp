@@ -163,11 +163,11 @@ bool Application::CheckWinVersion () const
 void Application::PrintUsage () const
 {
     constexpr wchar_t kUsageString[] =
-LR"(etwprof
+        LR"(etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug]
-    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--cswitch] [--nologo] [--verbose] [--debug]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug]
+    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
     etwprof --help
 
   Options:
@@ -182,6 +182,7 @@ LR"(etwprof
     --nologo         Do not print logo
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
     --compress=<c>   Compression method used on output file ("off", "etw", or "7z") [default: "etw"]
+    --enable=<args>  Format: (<GUID>|<RegisteredName>|*<Name>)[:KeywordBitmask[:MaxLevel['stack']]][+...]
     --cswitch        Collect context switch events as well (beta feature)
     --emulate=<f>    Debugging feature. Do not start a real time ETW session, use an already existing ETL file as input
 )";
@@ -221,7 +222,7 @@ bool Application::DoProfile ()
     ScopeLogger logger (LogSeverity::Debug,
                         L"Starting profiling command",
                         L"Stopping profiling command");
-    
+
     ProcessList::Process target;
     HANDLE hTargetProcess = INVALID_HANDLE_VALUE;
     if (!m_args.emulate) {
@@ -229,7 +230,7 @@ bool Application::DoProfile ()
             return false;
 
         Log (LogSeverity::Info, L"Found valid target: " + target.m_name + L" (" + std::to_wstring (target.m_PID) +
-            L")");
+             L")");
 
         // We open a HANDLE to the target process, lest it finishes and we profile an unintended process (this way Windows
         //   will not reassign the PID of the process, if it happens to exit while we are in this function)
@@ -237,7 +238,7 @@ bool Application::DoProfile ()
         hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.m_PID);
     }
 
-    OnExit processHandleCloser ([&hTargetProcess]() {
+    OnExit processHandleCloser ([&hTargetProcess] () {
         if (hTargetProcess != INVALID_HANDLE_VALUE)
             CloseHandle (hTargetProcess);
     });
@@ -257,20 +258,20 @@ bool Application::DoProfile ()
     if (finalOutputPath != profilerOutputPath)
         Log (LogSeverity::Info, L"Profiler output file path is " + profilerOutputPath);
 
+    IETWBasedProfiler::Flags options = IETWBasedProfiler::Default;
+    if (m_args.cswitch)
+        options |= IETWBasedProfiler::RecordCSwitches;
+
+    if (m_args.compressionMode == ApplicationArguments::CompressionMode::ETW)
+        options |= IETWBasedProfiler::Compress;
+
+    if (m_args.debug)
+        options |= IETWBasedProfiler::Debug;
+
     if (m_args.emulate) {
         Log (LogSeverity::Info, L"Constructing \"emulate mode\" profiler");
 
         try {
-            ETLReloggerProfiler::Flags options = ETWProfiler::Default;
-            if (m_args.cswitch)
-                options |= ETLReloggerProfiler::RecordCSwitches;
-
-            if (m_args.compressionMode == ApplicationArguments::CompressionMode::ETW)
-                options |= ETLReloggerProfiler::Compress;
-
-            if (m_args.debug)
-                options |= ETLReloggerProfiler::Debug;
-
             m_pProfiler.reset (new ETLReloggerProfiler (m_args.inputETLPath,
                                                         profilerOutputPath,
                                                         m_args.targetPID,
@@ -283,22 +284,12 @@ bool Application::DoProfile ()
     } else {
         if (ETWP_ERROR (!AddProfilePrivilegeToProcessToken ())) {
             Log (LogSeverity::Error, L"Unable to add \"SeSystemProfilePrivilege\" to the process' token! Contact your "
-                L"IT department!");
+                 L"IT department!");
 
             return false;
         }
 
         try {
-            ETWProfiler::Flags options = ETWProfiler::Default;
-            if (m_args.cswitch)
-                options |= ETWProfiler::RecordCSwitches;
-
-            if (m_args.compressionMode == ApplicationArguments::CompressionMode::ETW)
-                options |= ETWProfiler::Compress;
-
-            if (m_args.debug)
-                options |= ETWProfiler::Debug;
-
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
                                                 target.m_PID,
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
@@ -309,6 +300,10 @@ bool Application::DoProfile ()
             return false;
         }
     }
+
+    // Enable user providers
+    for (auto&& provInfo : m_args.userProviderInfos)
+        m_pProfiler->EnableProvider ({provInfo.guid, provInfo.stack, provInfo.maxLevel, provInfo.keywordBitmask });
 
     // Before starting profiling, write a minidump, if needed
     if (m_args.minidump && ETWP_VERIFY (!m_args.emulate)) {

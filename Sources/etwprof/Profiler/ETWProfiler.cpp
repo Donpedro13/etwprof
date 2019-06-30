@@ -2,22 +2,27 @@
 
 #include <process.h>
 #include <string>
-#include <unordered_set>
 
 #include "Log/Logging.hpp"
 
 #include "OS/ETW/ETWConstants.hpp"
+#include "OS/ETW/NormalETWSession.hpp"
 #include "OS/ETW/TraceRelogger.hpp"
 #include "OS/ETW/Win7KernelSession.hpp"
 #include "OS/ETW/Win8PlusKernelSession.hpp"
+
 #include "OS/FileSystem/Utility.hpp"
+
 #include "OS/Process/Utility.hpp"
+
 #include "OS/Synchronization/LockableGuard.hpp"
+
 #include "OS/Version/WinVersion.hpp"
 
 #include "ProfilerCommon.hpp"
 
 #include "Utility/Asserts.hpp"
+#include "Utility/GUID.hpp"
 #include "Utility/OnExit.hpp"
 
 namespace ETWP {
@@ -25,13 +30,14 @@ namespace ETWP {
 ETWProfiler::ETWProfiler (const std::wstring& outputPath,
                           DWORD target,
                           const ProfileRate& samplingRate,
-                          Flags options):
+                          IETWBasedProfiler::Flags options):
     m_lock (),
     m_resultLock (),
     m_hTargetProcess (nullptr),
     m_hWorkerThread (nullptr),
     m_ETWSession (nullptr),
     m_targetPID (target),
+    m_userProviders (),
     m_samplingRate (samplingRate),
     m_options (static_cast<Options> (options)),
     m_outputPath (outputPath),
@@ -258,6 +264,18 @@ bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
     return !m_profiling;
 }
 
+bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo)
+{
+    LockableGuard<CriticalSection> lockGuard (&m_lock);
+
+    if (ETWP_ERROR (m_profiling))
+        return false;
+
+    m_userProviders.push_back (providerInfo);
+
+    return true;
+}
+
 unsigned int ETWProfiler::ProfileHelper (void* instance)
 {
     ETWProfiler* pInstance = static_cast<ETWProfiler*> (instance);
@@ -305,7 +323,16 @@ void ETWProfiler::Profile ()
     LockableGuard<CriticalSection> lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
-    ProfileFilterData filterData = { { 1024 }, m_targetPID, bool (m_options & RecordCSwitches) };
+    ProfileFilterData filterData = { { 1024 }, { m_userProviders.begin (), m_userProviders.end () }, m_targetPID, bool (m_options & RecordCSwitches) };
+
+    if (ETWP_ERROR (!filterData.userProviders.empty () && GetWinVersion () < BaseWinVersion::Win8)) {
+        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+
+        m_result = ResultCode::Error;
+        m_errorFromWorkerThread = L"User providers are requested, but Windows version is less than 8!";
+
+        return;
+    }
 
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;
@@ -314,7 +341,7 @@ void ETWProfiler::Profile ()
     bool compress = m_options & Compress;
 
     try {
-        // Create and set up relogger before starting the kernel logger. This way we minimize the time between
+        // Create and set up the relogger before starting the kernel logger. This way we minimize the time between
         // relogging (~consuming) events, and the kernel logger emitting events into buffers
         TraceRelogger filteringRelogger (FilterEventForProfiling,
                                          rawOutputPath,
@@ -356,6 +383,27 @@ void ETWProfiler::Profile ()
 
             return;
         }
+
+        INormalETWSession* pNormalSession = dynamic_cast<INormalETWSession*> (m_ETWSession.get ()); // Eh...
+        ETWP_ASSERT (pNormalSession != nullptr);
+        for (auto&& providerInfo : filterData.userProviders) {
+            if (ETWP_ERROR (!pNormalSession->EnableProvider (&providerInfo.providerID,
+                                                             providerInfo.stack,
+                                                             providerInfo.level,
+                                                             providerInfo.flags)))
+            {
+                LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+
+                m_result = ResultCode::Error;
+
+                std::wstring guidString = L"UNKNOWN PROVIDER";
+                GUIDToString (providerInfo.providerID, &guidString);
+                m_errorFromWorkerThread = L"Unable to enable user provider: " + guidString;
+
+                return;
+            }
+        }
+            
 
         std::wstring errorMsg;
         if (ETWP_ERROR (!filteringRelogger.AddRealTimeSession (*m_ETWSession.get (), &errorMsg))) {
@@ -400,8 +448,7 @@ void ETWProfiler::Profile ()
     if (debug)
         rawETLDeleter.Deactivate ();
 
-    DWORD mergeFlags = EVENT_TRACE_MERGE_EXTENDED_DATA_IMAGEID |
-        EVENT_TRACE_MERGE_EXTENDED_DATA_EVENT_METADATA;
+    DWORD mergeFlags = EVENT_TRACE_MERGE_EXTENDED_DATA_IMAGEID | EVENT_TRACE_MERGE_EXTENDED_DATA_EVENT_METADATA;
     if (compress)
         mergeFlags |= EVENT_TRACE_MERGE_EXTENDED_DATA_COMPRESS_TRACE;
 

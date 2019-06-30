@@ -10,11 +10,11 @@
 namespace ETWP {
 
 bool StopETWSession (TRACEHANDLE hSession, const std::wstring& name, PEVENT_TRACE_PROPERTIES pProperties);
-bool StartETWSession (const std::wstring& name,
-                                    ULONG logFileMode,
-                                    ULONG enableFlags,
-                                    PTRACEHANDLE pHandle,
-                                    std::unique_ptr<EVENT_TRACE_PROPERTIES>* pPropertiesOut);
+bool StartRealTimeETWSession (const std::wstring& name,
+                              ULONG logFileMode,
+                              ULONG enableFlags,
+                              PTRACEHANDLE pHandle,
+                              std::unique_ptr<EVENT_TRACE_PROPERTIES>* pPropertiesOut);
 
 }   // namespace ETWP
 

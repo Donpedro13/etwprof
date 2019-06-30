@@ -27,6 +27,8 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/NormalETWSession.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/TraceRelogger.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/TraceRelogger.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Utils.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Utils.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win7KernelSession.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win7KernelSession.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win8PlusKernelSession.cpp
@@ -64,6 +66,8 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/ETWProfiler.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/ETLReloggerProfiler.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/ETLReloggerProfiler.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/IETWBasedProfiler.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/IETWBasedProfiler.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/IProfiler.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/IProfiler.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Profiler/ProfilerCommon.hpp
@@ -73,11 +77,15 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Asserts.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/GUID.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/GUID.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Macros.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/OnExit.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/OnExit.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/StringUtils.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/StringUtils.cpp
 		)
 
 # 3rd party binaries that need to be copied to the configuration's binary directory
@@ -109,4 +117,4 @@ SET(minor_version 2)
 SET(patch_version 0)
 TARGET_COMPILE_DEFINITIONS(etwprof PRIVATE -DETWP_MAJOR_VERSION=${major_version} -DETWP_MINOR_VERSION=${minor_version} -DETWP_PATCH_VERSION=${patch_version})
 
-TARGET_LINK_LIBRARIES(etwprof dbghelp)
+TARGET_LINK_LIBRARIES(etwprof dbghelp tdh)

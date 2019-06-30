@@ -37,6 +37,7 @@ public:
 class INormalETWSession : public virtual IETWSession {
 public:
     virtual bool EnableProvider (LPCGUID pProviderID,
+                                 bool collectStacks,
                                  UCHAR level = TRACE_LEVEL_VERBOSE,
                                  ULONGLONG mathcAnyKeyword = 0,
                                  ULONGLONG mathcAllKeyword = 0) = 0;

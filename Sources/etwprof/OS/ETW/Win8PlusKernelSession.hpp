@@ -25,6 +25,7 @@ public:
     virtual TRACEHANDLE GetNativeHandle () const override;
 
     virtual bool EnableProvider (LPCGUID pProviderID,
+                                 bool collectStacks,
                                  UCHAR level = TRACE_LEVEL_VERBOSE,
                                  ULONGLONG mathcAnyKeyword = 0,
                                  ULONGLONG mathcAllKeyword = 0) override;
@@ -34,10 +35,12 @@ public:
     virtual ULONG GetKernelFlags () const override;
 
 protected:
-    TRACEHANDLE m_handle;
-    std::wstring m_name;
-    ULONG m_flags;
+    TRACEHANDLE                             m_handle;
     std::unique_ptr<EVENT_TRACE_PROPERTIES> m_properties;
+    ULONG                                   m_flags;
+
+    std::wstring m_name;
+    
     bool m_started;
 };
 

@@ -23,12 +23,15 @@ struct ApplicationRawArguments {
     bool cswitch = false;
     bool minidump = false;
     bool minidumpFlags = false;
+    bool userProviders = false;
+
     std::wstring outputValue;
     std::wstring samplingRateValue;
     std::wstring targetValue;
     std::wstring inputETLPath;
     std::wstring compressionMode;
     std::wstring minidumpFlagsValue;
+    std::wstring userProvidersValue;
 };
 
 struct ApplicationArguments {
@@ -37,6 +40,22 @@ struct ApplicationArguments {
         Off,
         ETW,
         SevenZip
+    };
+
+    struct UserProviderInfo {
+        enum IDType {
+            GUID,
+            RegisteredName, // Registered provider with a "known name"
+            DynamicName     // A name prefixed with '*', we have to use this name to generate a GUID
+        };
+
+        std::wstring name;
+        ::GUID       guid;
+        IDType       type = RegisteredName;
+
+        ULONGLONG keywordBitmask = 0;
+        UCHAR     maxLevel = 0;
+        bool      stack = false;
     };
 
     bool profile = false;
@@ -49,13 +68,15 @@ struct ApplicationArguments {
     bool debug = false;
     bool cswitch = false;
     bool minidump = false;
-    DWORD           targetPID;
-    std::wstring    targetName;
-    std::wstring    output;
-    std::wstring    inputETLPath;
-    uint32_t        samplingRate;
-    CompressionMode compressionMode = CompressionMode::Invalid;
-    uint32_t        minidumpFlags;
+
+    DWORD                         targetPID;
+    std::wstring                  targetName;
+    std::wstring                  output;
+    std::wstring                  inputETLPath;
+    uint32_t                      samplingRate;
+    CompressionMode               compressionMode = CompressionMode::Invalid;
+    uint32_t                      minidumpFlags;
+    std::vector<UserProviderInfo> userProviderInfos;
 };
 
 bool ParseArguments (const std::vector<std::wstring>& arguments,
