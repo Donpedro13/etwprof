@@ -1,2 +1,15 @@
+=== 0.2 ===
+Features:
+- Response files are supported
+- (Win8+ only) One or more user providers can now be captured, with keyword and level filtering, and optional call stack collection
+
+Bugfixes:
+- Fixed broken emulate mode (--emulate)
+- Some type of folders were erroneously detected as files
+- Eliminated some CRITICAL_SECTION leaks
+
+Miscellaneous:
+- Upgraded 7zr.exe from 18.05 to 19.00
+
 === 0.1 ===
 - Initial release
