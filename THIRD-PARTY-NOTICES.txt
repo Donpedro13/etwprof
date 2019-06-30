@@ -1,6 +1,6 @@
 etwprof uses third-party libraries and executables that may be distributed under licenses different that of etwprof's.
 
-1.) 7zr.exe (18.05)
+1.) 7zr.exe (19.00)
 
 7zr.exe is part of the LZMA SDK, which is placed in the public domain.
 
