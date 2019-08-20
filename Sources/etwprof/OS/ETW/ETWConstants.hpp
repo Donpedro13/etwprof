@@ -16,7 +16,7 @@ const UCHAR CSwitchOpcode = 36;
 const UCHAR ReadyThreadOpcode = 50;
 
 // Process opcodes
-const UCHAR PStartOpcode = 2;
+const UCHAR PStartOpcode = 1;
 const UCHAR PEndOpcode = 2;
 const UCHAR PDCStartOpcode = 3;
 const UCHAR PDCEndOpcode = 4;
