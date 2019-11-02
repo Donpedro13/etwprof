@@ -1,19 +1,20 @@
 # SOURCE_GROUP is used with TREE (avaliable since 3.8.0.)
 # The /diagnostics:caret cl option is used (avaliable since 3.11.0.)
-CMAKE_MINIMUM_REQUIRED(VERSION 3.11.0 FATAL_ERROR)
+# Visual Studio 2019 support needed (avaliable since 3.14.0.)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.14.0 FATAL_ERROR)
 
 # Check platform
 IF(NOT WIN32)
 	MESSAGE(FATAL_ERROR "etwprof can only be built on Windows!")
 ENDIF()
 
-# Check for VS 2017 generator
-IF(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio 15 2017")
-    MESSAGE(FATAL_ERROR "Only Visual Studio 2017 projects are supported!")
+# Check for VS 2019 generator
+IF(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio 16 2019")
+    MESSAGE(FATAL_ERROR "Only Visual Studio 2019 projects are supported!")
 ENDIF()
 
 # Check for target bitness
-IF(NOT "${CMAKE_GENERATOR}" MATCHES "Win64")
+IF(NOT "${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64")
     MESSAGE(FATAL_ERROR "Currently, only 64-bit builds are supported!")
 ENDIF()
 
@@ -60,7 +61,7 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EXE_LINKER_FLAGS_IMPL}")
 # Global definitions
 ADD_DEFINITIONS(-DUNICODE -D_UNICODE)
 ADD_DEFINITIONS(-DWINVER=0x601 -DWIN32_WINNT=0x601)	# Minimum supported version is Windows 7
-IF("${CMAKE_GENERATOR}" MATCHES "Win64")
+IF("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64")
     ADD_DEFINITIONS(-DETWP_64BIT)
 ELSE()
 	ADD_DEFINITIONS(-DETWP_32BIT)

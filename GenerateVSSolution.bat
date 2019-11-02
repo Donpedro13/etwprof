@@ -6,8 +6,8 @@ IF EXIST %~dp0CMakeFiles rd /S /Q %~dp0CMakeFiles || GOTO abort
 mkdir %~dp0IDE || GOTO abort
 :: Change current directory for cmake to generate its output to the correct folder
 pushd %~dp0IDE
-:: Call cmake with the Visual Studio 2017 generator, and use the x64 toolset
-cmake -G "Visual Studio 15 2017 Win64" -T host=x64 %~dp0
+:: Call cmake with the Visual Studio 2019 generator, and use the x64 toolset
+cmake -G "Visual Studio 16 2019" -A "x64" -T host=x64 %~dp0
 
 :: Change back to the original current directory
 popd
