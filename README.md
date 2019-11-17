@@ -1,6 +1,8 @@
 etwprof
 ==========
 
+[![Build Status](https://dev.azure.com/donpedro901/etwprof/_apis/build/status/Donpedro13.etwprof?branchName=master)](https://dev.azure.com/donpedro901/etwprof/_build/latest?definitionId=2&branchName=master)
+
 etwprof is a lightweight, self-contained sampling profiler for native applications on Windows. It's based on the [Event Tracing for Windows](https://msdn.microsoft.com/en-us/library/windows/desktop/bb968803(v=vs.85).aspx) (ETW) framework.
 
 This profiler has the following design goals:
