@@ -1,0 +1,31 @@
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - 3rdParty/*
+      - Sources/*
+      - CMakeLists.txt
+      - GenerateVSSolution.bat
+
+pool:
+  vmImage: 'windows-2019'
+
+jobs:
+- template: build_template.yml
+  parameters:
+    configuration: 'Debug_StaticCRT'
+    platform: 'x64'
+- template: build_template.yml
+  parameters:
+    configuration: 'Release_StaticCRT'
+    platform: 'x64'
+- template: build_template.yml
+  parameters:
+    configuration: 'Analyze_Debug'
+    platform: 'x64'
+- template: build_template.yml
+  parameters:
+    configuration: 'Analyze_Release'
+    platform: 'x64'

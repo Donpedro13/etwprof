@@ -1,0 +1,16 @@
+jobs:
+- job: Build_${{ parameters.configuration }}_${{ parameters.platform }}
+  steps:
+  - task: BatchScript@1
+    displayName: 'Generate Solution (CMake)'
+    inputs:
+      filename: 'GenerateVSSolution.bat'
+  - task: VSBuild@1
+    displayName: 'Build'
+    inputs:
+      solution: 'IDE\etwprof.sln'
+      vsVersion: '16.0'
+      platform: ${{ parameters.platform }}
+      configuration: ${{ parameters.configuration }}
+      clean: true
+      msbuildArchitecture: 'x64'
