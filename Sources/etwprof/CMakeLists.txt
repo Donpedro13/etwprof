@@ -58,6 +58,8 @@ SET(etwprof_sources
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/ProfileInterruptRate.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/ProfileInterruptRate.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/WinInternal.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/WinInternal.cpp
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Version/WinVersion.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Version/WinVersion.cpp

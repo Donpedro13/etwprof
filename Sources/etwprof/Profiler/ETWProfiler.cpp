@@ -2,10 +2,12 @@
 
 #include <process.h>
 #include <string>
+#include <vector>
 
 #include "Log/Logging.hpp"
 
 #include "OS/ETW/ETWConstants.hpp"
+#include "OS/ETW/ETWSessionCommon.hpp"
 #include "OS/ETW/NormalETWSession.hpp"
 #include "OS/ETW/TraceRelogger.hpp"
 #include "OS/ETW/Win7KernelSession.hpp"
@@ -365,16 +367,21 @@ void ETWProfiler::Profile ()
         });
 
         // We need stack traces for: - sampled profile
-        //                           - ready thread
-        //                           - context switch
-        CLASSIC_EVENT_ID classes[] = { { PerfInfoGuid, ETWConstants::SampledProfileOpcode, {} },
-                                       { ThreadGuid,   ETWConstants::ReadyThreadOpcode,    {} },
-                                       { ThreadGuid,   ETWConstants::CSwitchOpcode,        {} } };
+        //                           - ready thread and context switch (if we collect context switch data)
+        std::vector<CLASSIC_EVENT_ID> eventIDArray (10);
+        eventIDArray.push_back ({ PerfInfoGuid, ETWConstants::SampledProfileOpcode, {} });
 
-        if (ETWP_ERROR (TraceSetInformation (m_ETWSession->GetNativeHandle (),
+        if (m_options & RecordCSwitches) {
+            eventIDArray.push_back ({ ThreadGuid, ETWConstants::ReadyThreadOpcode, {} });
+            eventIDArray.push_back ({ ThreadGuid, ETWConstants::CSwitchOpcode,     {} });
+        }
+
+        if (eventIDArray.size () > 0 &&
+            ETWP_ERROR (TraceSetInformation (m_ETWSession->GetNativeHandle (),
                                              TraceStackTracingInfo,
-                                             classes,
-                                             sizeof classes) != ERROR_SUCCESS))
+                                             &eventIDArray[0],
+                                             static_cast<DWORD> (eventIDArray.size ()) *
+                                                sizeof (CLASSIC_EVENT_ID)) != ERROR_SUCCESS))
         {
             LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
 
@@ -384,8 +391,8 @@ void ETWProfiler::Profile ()
             return;
         }
 
-        INormalETWSession* pNormalSession = dynamic_cast<INormalETWSession*> (m_ETWSession.get ()); // Eh...
-        ETWP_ASSERT (pNormalSession != nullptr);
+        INormalETWSession* pNormalSession = dynamic_cast<INormalETWSession*> (m_ETWSession.get ());
+        ETWP_ASSERT (pNormalSession != nullptr);    // Win version checked earlier
         for (auto&& providerInfo : filterData.userProviders) {
             if (ETWP_ERROR (!pNormalSession->EnableProvider (&providerInfo.providerID,
                                                              providerInfo.stack,
@@ -398,12 +405,23 @@ void ETWProfiler::Profile ()
 
                 std::wstring guidString = L"UNKNOWN PROVIDER";
                 GUIDToString (providerInfo.providerID, &guidString);
-                m_errorFromWorkerThread = L"Unable to enable user provider: " + guidString;
+                m_errorFromWorkerThread = L"Failed to enable user provider: " + guidString;
 
                 return;
             }
         }
-            
+
+        if (m_options & StackCache) {
+            if (ETWP_ERROR (!EnableStackCachingForSession (m_ETWSession->GetNativeHandle () , 8 * 1'024 * 1'024, 2'039))) {
+				LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+
+				m_result = ResultCode::Error;
+
+				m_errorFromWorkerThread = L"Failed to enable stack caching for ETW session!";
+
+				return;
+            }
+        }
 
         std::wstring errorMsg;
         if (ETWP_ERROR (!filteringRelogger.AddRealTimeSession (*m_ETWSession.get (), &errorMsg))) {

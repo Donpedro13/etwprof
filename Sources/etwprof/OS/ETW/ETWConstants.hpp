@@ -25,7 +25,14 @@ const UCHAR PDCEndOpcode = 4;
 const UCHAR SampledProfileOpcode = 46;
 
 // EventTraceEvent opcodes
-const UCHAR RDComplete = 8;
+const UCHAR RDCompleteOpcode = 8;
+
+// StackWalk opcodes
+const UCHAR StackWalkOpcode = 32;
+const UCHAR StackWalkKeyDeleteOpcode = 35;
+const UCHAR StackWalkKeyRundownOpcode = 36;
+const UCHAR StackKeyKernelOpcode = 37;
+const UCHAR StackKeyUserOpcode = 38;
 
 struct ThreadDataStub {
     DWORD m_processID;
@@ -72,6 +79,13 @@ struct StackWalkDataStub {
     DWORD  m_processID;
     DWORD  m_threadID;
     // Other members follow in the "real" struct
+};
+
+struct StackKeyReference {
+	UINT64   m_timeStamp;
+	DWORD    m_processID;
+	DWORD    m_threadID;
+    UINT_PTR m_key;
 };
 
 }   // namespace ETWConstants

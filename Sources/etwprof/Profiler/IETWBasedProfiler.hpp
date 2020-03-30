@@ -24,10 +24,11 @@ public:
     using Flags = uint8_t;
 
     enum Options : Flags {
-        Default         = 0b000,     
-        RecordCSwitches = 0b001,     // Record context switch information
-        Compress        = 0b010,     // Compress result ETL with ETW's built-in compression
-        Debug           = 0b100      // Preserve intermediate ETL files (if any)
+        Default         = 0b0000,     
+        RecordCSwitches = 0b0001,     // Record context switch information
+        Compress        = 0b0010,     // Compress result ETL with ETW's built-in compression
+        Debug           = 0b0100,     // Preserve intermediate ETL files (if any)
+        StackCache      = 0b1000      // Use ETW's stack caching feature
     };
 
     IETWBasedProfiler () = default;

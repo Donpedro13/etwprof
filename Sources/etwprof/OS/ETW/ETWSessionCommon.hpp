@@ -16,6 +16,8 @@ bool StartRealTimeETWSession (const std::wstring& name,
                               PTRACEHANDLE pHandle,
                               std::unique_ptr<EVENT_TRACE_PROPERTIES>* pPropertiesOut);
 
+bool EnableStackCachingForSession (TRACEHANDLE pSession, uint32_t cacheSize, uint32_t bucketCount);
+
 }   // namespace ETWP
 
 #endif  // #ifndef ETWP_ETW_SESSION_COMMON_HPP

@@ -1,5 +1,7 @@
 #include "ETWSessionCommon.hpp"
 
+#include "OS/Utility/WinInternal.hpp"
+
 namespace ETWP {
 
 bool StopETWSession (TRACEHANDLE hSession, const std::wstring& name, PEVENT_TRACE_PROPERTIES pProperties)
@@ -37,6 +39,20 @@ bool StartRealTimeETWSession (const std::wstring& name,
     } else {
         return false;
     }
+}
+
+bool EnableStackCachingForSession (TRACEHANDLE pSession, uint32_t cacheSize, uint32_t bucketCount)
+{
+	WinInternal::EVENT_TRACE_STACK_CACHING_INFORMATION stackCacheInfo;
+	stackCacheInfo.EventTraceInformationClass = WinInternal::EventTraceStackCachingInformation;
+	stackCacheInfo.TraceHandle = pSession;
+	stackCacheInfo.Enabled = TRUE;
+	stackCacheInfo.CacheSize = cacheSize;
+	stackCacheInfo.BucketCount = bucketCount;
+
+	return WinInternal::NtSetSystemInformation (WinInternal::SystemPerformanceTraceInformation,
+												&stackCacheInfo,
+												sizeof stackCacheInfo) == STATUS_SUCCESS;
 }
 
 }   // namespace ETWP

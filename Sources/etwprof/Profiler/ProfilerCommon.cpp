@@ -21,12 +21,30 @@ bool IsKernelModeAddress (UINT_PTR address)
 #endif  // #ifdef ETWP_64BIT
 }
 
-bool FilterStackWalkEvent (ProfileFilterData* pFilterData, void* pUserData)
+bool FilterStackWalkEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUserData)
 {
-    const ETWConstants::StackWalkDataStub* pData =
-        reinterpret_cast<const ETWConstants::StackWalkDataStub*> (pUserData);
+    switch (opcode) {
+        case ETWConstants::StackWalkKeyDeleteOpcode:
+	    case ETWConstants::StackWalkKeyRundownOpcode:
+            return true;
 
-    return pData->m_processID == pFilterData->targetPID;
+	    case ETWConstants::StackKeyKernelOpcode:
+        case ETWConstants::StackKeyUserOpcode: {
+            const ETWConstants::StackKeyReference* pData =
+                reinterpret_cast<const ETWConstants::StackKeyReference*> (pUserData);
+
+            return pData->m_processID == pFilterData->targetPID;
+        }
+
+        case ETWConstants::StackWalkOpcode: {
+            const ETWConstants::StackWalkDataStub* pData =
+                reinterpret_cast<const ETWConstants::StackWalkDataStub*> (pUserData);
+
+            return pData->m_processID == pFilterData->targetPID;
+        }
+    }
+
+    return false;
 }
 
 bool FilterThreadEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUserData)
@@ -120,7 +138,7 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
 
     EVENT_HEADER* pHeader = &pEventRecord->EventHeader;
     if (pHeader->ProviderId == StackWalkGuid) {
-        if (FilterStackWalkEvent (pFilterData, pEventRecord->UserData)) {
+        if (FilterStackWalkEvent (pHeader->EventDescriptor.Opcode, pFilterData, pEventRecord->UserData)) {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))
                 Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);
@@ -128,7 +146,8 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
             return;
         }
     } else if (pHeader->ProviderId == PerfInfoGuid &&
-               pHeader->EventDescriptor.Opcode == ETWConstants::SampledProfileOpcode) {
+               pHeader->EventDescriptor.Opcode == ETWConstants::SampledProfileOpcode)
+    {
         if (FilterSampledProfileEvent (pFilterData, pEventRecord->UserData)) {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))
