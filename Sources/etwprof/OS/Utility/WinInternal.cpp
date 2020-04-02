@@ -38,6 +38,10 @@ NtSetSystemInformation_t GetNtSetSystemInformationAddress ()
 
 }	// namespace
 
+// Note: error handling omitted below (if for whatever reason GetProcAddress fails, we just crash...)
+#pragma warning(push)
+#pragma warning(disable: 6011)
+
 NTSTATUS NtQuerySystemInformation (SYSTEM_INFORMATION_CLASS SystemInformationClass,
                                    PVOID SystemInformation,
                                    ULONG SystemInformationLength,
@@ -47,8 +51,6 @@ NTSTATUS NtQuerySystemInformation (SYSTEM_INFORMATION_CLASS SystemInformationCla
     NtQuerySystemInformation_t pFunction = nullptr;
     if (!queried) {
         pFunction = GetNtQuerySystemInformationAddress ();
-
-        // Note: error handling omitted (if for whatever reason this GetProcAddress fails, we just crash...)
 
         queried = true;
     }
@@ -65,13 +67,13 @@ NTSTATUS NtSetSystemInformation (SYSTEM_INFORMATION_CLASS SystemInformationClass
     if (!queried) {
         pFunction = GetNtSetSystemInformationAddress ();
 
-        // Note: error handling omitted (if for whatever reason this GetProcAddress fails, we just crash...)
-
         queried = true;
     }
 
     return pFunction (SystemInformationClass, SystemInformation, SystemInformationLength);
 }
+
+#pragma warning(pop)
 
 }	// namespace WinInternal
 }   // namespace ETWP
