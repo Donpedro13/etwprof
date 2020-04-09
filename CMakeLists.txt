@@ -1,7 +1,8 @@
 # SOURCE_GROUP is used with TREE (avaliable since 3.8.0.)
 # The /diagnostics:caret cl option is used (avaliable since 3.11.0.)
 # Visual Studio 2019 support needed (avaliable since 3.14.0.)
-CMAKE_MINIMUM_REQUIRED(VERSION 3.14.0 FATAL_ERROR)
+# TARGET_PRECOMPILE_HEADERS is used (avaliable since 3.16.0.)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16.0 FATAL_ERROR)
 
 # Check platform
 IF(NOT WIN32)
@@ -82,6 +83,9 @@ STRING(CONCAT BASE_RELEASE_FLAGS_IMPL
 			  "/D ETWP_RELEASE "
 			  )
 SET(BASE_RELEASE_FLAGS ${BASE_RELEASE_FLAGS_IMPL})
+
+# We need this since 3.15 to be able to fiddle with the CRT config "directly"
+SET(CMAKE_MSVC_RUNTIME_LIBRARY "")
 
 # Configuration specific compiler and linker options
 SET(CMAKE_CXX_FLAGS_DEBUG_STATICCRT "${BASE_DEBUG_FLAGS} /MTd")				# Static, debug CRT

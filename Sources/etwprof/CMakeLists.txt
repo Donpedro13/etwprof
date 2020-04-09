@@ -105,6 +105,9 @@ SET(3rdparty_binaries
 
 ADD_EXECUTABLE(etwprof ${etwprof_sources} ${3rdparty_binaries})
 
+# PCH
+TARGET_PRECOMPILE_HEADERS(etwprof PRIVATE <windows.h> <string> <memory>)
+
 SOURCE_GROUP(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${etwprof_sources})
 
 TARGET_INCLUDE_DIRECTORIES(etwprof PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
