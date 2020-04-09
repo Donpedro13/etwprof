@@ -325,7 +325,11 @@ void ETWProfiler::Profile ()
     LockableGuard<CriticalSection> lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
-    ProfileFilterData filterData = { { 1024 }, { m_userProviders.begin (), m_userProviders.end () }, m_targetPID, bool (m_options & RecordCSwitches) };
+    ProfileFilterData filterData = { { 1024 },
+                                     { m_userProviders.begin (), m_userProviders.end () },
+                                     {},
+                                     m_targetPID,
+                                     bool (m_options & RecordCSwitches) };
 
     if (ETWP_ERROR (!filterData.userProviders.empty () && GetWinVersion () < BaseWinVersion::Win8)) {
         LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
@@ -412,7 +416,7 @@ void ETWProfiler::Profile ()
         }
 
         if (m_options & StackCache) {
-            if (ETWP_ERROR (!EnableStackCachingForSession (m_ETWSession->GetNativeHandle () , 8 * 1'024 * 1'024, 2'039))) {
+            if (ETWP_ERROR (!EnableStackCachingForSession (m_ETWSession->GetNativeHandle (), 8 * 1'024 * 1'024, 2'039))) {
 				LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
 
 				m_result = ResultCode::Error;

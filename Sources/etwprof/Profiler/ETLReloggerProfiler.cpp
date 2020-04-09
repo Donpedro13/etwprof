@@ -211,7 +211,11 @@ void ETLReloggerProfiler::Profile ()
     LockableGuard<CriticalSection> lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
-    ProfileFilterData filterData = { {}, {m_userProviders.begin (), m_userProviders.end () } , m_targetPID, bool (m_options & RecordCSwitches) };
+    ProfileFilterData filterData = { {},
+                                     {m_userProviders.begin (), m_userProviders.end () },
+                                     {},
+                                     m_targetPID,
+                                     bool (m_options & RecordCSwitches) };
 
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;

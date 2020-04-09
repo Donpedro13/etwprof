@@ -48,7 +48,7 @@ STRING(CONCAT CXX_FLAGS_IMPL
 			  "/Zi "				# Debug info format is PDB
 			  "/diagnostics:caret "	# Why is this not the default?
 			  "/permissive- "		# More conformance
-			  "/std:c++17 "			# Support for C++17 features
+			  "/std:c++latest "		# Support for C++17+ features
 			  )
 SET(CMAKE_CXX_FLAGS	${CXX_FLAGS_IMPL})
 

@@ -88,6 +88,11 @@ struct StackKeyReference {
     UINT_PTR m_key;
 };
 
+struct StackKeyDefinition {
+    UINT_PTR m_key;
+    // Other members follow in the "real" struct
+};
+
 }   // namespace ETWConstants
 }   // namespace ETWP
 

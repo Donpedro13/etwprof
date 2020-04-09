@@ -28,6 +28,7 @@ struct ProfileFilterData {
     // In theory, std::vector should perform better if the number of providers is small. However, my experiments showed
     //   only a very tiny difference, so using a hash set alone should suffice
     std::unordered_set<IETWBasedProfiler::ProviderInfo> userProviders;
+    std::unordered_set<UINT_PTR> stackKeys;  // For stack cache filtering (when enabled)
     DWORD targetPID;
     bool  cswitch;
 };

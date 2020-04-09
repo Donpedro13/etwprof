@@ -24,23 +24,39 @@ bool IsKernelModeAddress (UINT_PTR address)
 bool FilterStackWalkEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUserData)
 {
     switch (opcode) {
-        case ETWConstants::StackWalkKeyDeleteOpcode:
-	    case ETWConstants::StackWalkKeyRundownOpcode:
-            return true;
-
-	    case ETWConstants::StackKeyKernelOpcode:
-        case ETWConstants::StackKeyUserOpcode: {
-            const ETWConstants::StackKeyReference* pData =
-                reinterpret_cast<const ETWConstants::StackKeyReference*> (pUserData);
-
-            return pData->m_processID == pFilterData->targetPID;
-        }
-
         case ETWConstants::StackWalkOpcode: {
             const ETWConstants::StackWalkDataStub* pData =
                 reinterpret_cast<const ETWConstants::StackWalkDataStub*> (pUserData);
 
             return pData->m_processID == pFilterData->targetPID;
+        }
+
+        case ETWConstants::StackKeyKernelOpcode:
+        case ETWConstants::StackKeyUserOpcode: {
+            const ETWConstants::StackKeyReference* pData =
+                reinterpret_cast<const ETWConstants::StackKeyReference*> (pUserData);
+
+            if (pData->m_processID == pFilterData->targetPID) {
+                pFilterData->stackKeys.insert (pData->m_key);
+
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        case ETWConstants::StackWalkKeyDeleteOpcode:
+        case ETWConstants::StackWalkKeyRundownOpcode: {
+            const ETWConstants::StackKeyDefinition* pData =
+                reinterpret_cast<const ETWConstants::StackKeyDefinition*> (pUserData);
+
+            if (pFilterData->stackKeys.contains (pData->m_key)) {
+                pFilterData->stackKeys.erase (pData->m_key);
+
+                return true;
+            } else {
+                return false;
+            }
         }
     }
 
