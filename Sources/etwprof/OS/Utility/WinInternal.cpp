@@ -48,7 +48,7 @@ NTSTATUS NtQuerySystemInformation (SYSTEM_INFORMATION_CLASS SystemInformationCla
                                    ULONG* ReturnLength)
 {
     static bool queried;
-    NtQuerySystemInformation_t pFunction = nullptr;
+    static NtQuerySystemInformation_t pFunction = nullptr;
     if (!queried) {
         pFunction = GetNtQuerySystemInformationAddress ();
 
@@ -63,7 +63,7 @@ NTSTATUS NtSetSystemInformation (SYSTEM_INFORMATION_CLASS SystemInformationClass
                                  ULONG SystemInformationLength)
 {
     static bool queried;
-    NtSetSystemInformation_t pFunction = nullptr;
+    static NtSetSystemInformation_t pFunction = nullptr;
     if (!queried) {
         pFunction = GetNtSetSystemInformationAddress ();
 
