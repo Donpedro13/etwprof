@@ -24,6 +24,7 @@ struct ApplicationRawArguments {
     bool minidump = false;
     bool minidumpFlags = false;
     bool userProviders = false;
+    bool stackCache = false;
 
     std::wstring outputValue;
     std::wstring samplingRateValue;
@@ -68,6 +69,7 @@ struct ApplicationArguments {
     bool debug = false;
     bool cswitch = false;
     bool minidump = false;
+    bool stackCache = false;
 
     DWORD                         targetPID;
     std::wstring                  targetName;

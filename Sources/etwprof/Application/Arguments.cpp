@@ -251,7 +251,7 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
     ETWP_ASSERT (!IsAssignmentArg (arg));
 
     std::wstring argName = GetArgName (arg);
-    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump
+    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache
     if (argName == L"help") {
         pArgumentsOut->help = true;
 
@@ -276,7 +276,11 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
         pArgumentsOut->minidump = true;
 
         return true;
-    }
+	} else if (argName == L"scache") {
+		pArgumentsOut->stackCache = true;
+
+		return true;
+	}
 
     LogFailedParse (L"Unknown non-value argument!", arg);
 
@@ -738,10 +742,10 @@ bool SemaUserProviderInfos (const ApplicationRawArguments& parsedArgs, Applicati
 
     // User providers are supported on Win8+ only
     if (GetWinVersion () < BaseWinVersion::Win8) {
-        Log (LogSeverity::Warning,
+        Log (LogSeverity::Error,
              L"User providers are supported on Windows 8 and later only! Events from these providers will not be collected!");
 
-        return true;
+        return false;
     }
 
     switch (DetermineUserProviderInfoVersion (parsedArgs.userProvidersValue)) {
@@ -752,6 +756,26 @@ bool SemaUserProviderInfos (const ApplicationRawArguments& parsedArgs, Applicati
 
             return false;
     }
+}
+
+bool SemaStackCache (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
+{
+	if (!parsedArgs.stackCache)
+		return true;
+
+	if (pArgumentsOut->emulate) {
+		LogFailedSema (L"ETW stack caching parameter is invalid in emulate mode!");
+
+		return false;
+	}
+
+	if (GetWinVersion () < BaseWinVersion::Win8) {
+        Log (LogSeverity::Error, L"ETW stack caching is supported on Windows 8 and later only!");
+
+		return false;
+	}
+
+    return true;
 }
 
 bool UnpackRespFiles (const std::vector<std::wstring>& arguments, std::vector<std::wstring>* pArgumentsOut)
@@ -873,6 +897,7 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     pArgumentsOut->emulate = parsedArgs.emulate;
     pArgumentsOut->cswitch = parsedArgs.cswitch;
     pArgumentsOut->minidump = parsedArgs.minidump;
+    pArgumentsOut->stackCache = parsedArgs.stackCache;
 
     // We could check here if both --debug and --verbose was provided, but I don't think we need to be that nitpicky
 
@@ -903,6 +928,9 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
 
         if (!SemaUserProviderInfos (parsedArgs, pArgumentsOut))
             return false;
+
+		if (!SemaStackCache (parsedArgs, pArgumentsOut))
+			return false;
     } else {    // Not profiling
         if (parsedArgs.target) {
             LogFailedSema (L"Target parameter is only valid for profiling!");
@@ -951,6 +979,12 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
 
             return false;
         }
+
+		if (parsedArgs.stackCache) {
+			LogFailedSema (L"Stack cache parameter is only valid for profiling!");
+
+			return false;
+		}
     }
 
     return true;

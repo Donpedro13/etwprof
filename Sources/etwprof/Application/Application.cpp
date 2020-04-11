@@ -166,7 +166,7 @@ void Application::PrintUsage () const
         LR"(etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
     etwprof --help
 
@@ -183,6 +183,7 @@ void Application::PrintUsage () const
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
     --compress=<c>   Compression method used on output file ("off", "etw", or "7z") [default: "etw"]
     --enable=<args>  Format: (<GUID>|<RegisteredName>|*<Name>)[:KeywordBitmask[:MaxLevel['stack']]][+...]
+    --scache         Enable ETW stack caching
     --cswitch        Collect context switch events as well (beta feature)
     --emulate=<f>    Debugging feature. Do not start a real time ETW session, use an already existing ETL file as input
 )";
@@ -267,6 +268,9 @@ bool Application::DoProfile ()
 
     if (m_args.debug)
         options |= IETWBasedProfiler::Debug;
+
+	if (m_args.stackCache)
+		options |= IETWBasedProfiler::StackCache;
 
     if (m_args.emulate) {
         Log (LogSeverity::Info, L"Constructing \"emulate mode\" profiler");

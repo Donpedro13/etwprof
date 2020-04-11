@@ -7,7 +7,7 @@ Please see "Usage" on the [Readme page](../README.md) first.
 etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
     etwprof --help
 
@@ -24,6 +24,7 @@ etwprof
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
     --compress=<c>   Compression method used on output file ("off", "etw", or "7z") [default: "etw"]
     --enable=<args>  Format: (<GUID>|<RegisteredName>|*<Name>)[:KeywordBitmask[:MaxLevel['stack']]][+...]
+    --scache         Enable ETW stack caching
     --cswitch        Collect context switch events as well (beta feature)
     --emulate=<f>    Debugging feature. Do not start a real time ETW session, use an already existing ETL file as input
 ```
@@ -44,14 +45,16 @@ With this option, etwprof will choose a convenient output filename for you.
 Environment variables are explicitly expanded in these paths, so you can use them (such as `%USERPROFILE%`, `%TMP%`, etc.)
 * `--rate`  
 The profiler rate is **global**, and persistent until reboot.
+* `--compress`  
+Using the built-in compression (`etw`, the default) is convenient, as there is no manual decompression needed. Using 7-Zip (`7z`) results in smaller result files, but requires decompression before trace analysis.
+* `--enable`  
+Collects events from the specified user providers (filtered to the target process). The syntax is very similar to xperf's [`-on`](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/start) switch. You can specify one or more providers by name, GUID, or prefixing the provider name with an astersik. The latter will infer the GUID using the [standard algorithm](https://blogs.msdn.microsoft.com/dcook/2015/09/08/etw-provider-names-and-guids/). You can filter events by keyword and level, and also request stack traces to be collected. It's best to have a look at some examples below.
+* `--scache`  
+Turns on ETW's stack caching feature. Using this option might reduce the result `.etl` file's size given enough duplicated call stacks. Use this if the profiled program has lots of hot spots and/or traced events with call stacks (e.g. user providers) are emitted from a limited variety of locations. Consumes up to 40 MBs of non-paged pool while profiling.
 * `--cswitch`  
 Does not work reliably (see [Limitations and known issues](./Limitations_known_issues.md) for details).
 * `--emulate`  
 Debugging feature. You can feed an already existing `.etl` file to etwprof with this, it will be filtered the same way as a real-time kernel session. Useful for reproducing bugs. Works with [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) traces only.
-* `--compress`  
-Using the built-in compression (`etw`, the default) is convenient, as there is no manual decompression needed. Using 7-Zip (`7z`) results in smaller result files, but requires decompression before trace analysis.
-* `--enable`  
-Collects events from the specified user providers (filtered to the target process). The syntax is very similar to xperf's [`-on`]() switch. You can specify one or more providers by name, GUID, or prefixing the provider name with an astersik. The latter will infer the GUID using the [standard algorithm](https://blogs.msdn.microsoft.com/dcook/2015/09/08/etw-provider-names-and-guids/). You can filter events by keyword and level, and also request stack traces to be collected. It's best to have a look at some examples below.
 
 Examples
 ----------

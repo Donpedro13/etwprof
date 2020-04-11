@@ -82,6 +82,7 @@ private:
 
     std::wstring GenerateETWSessionName ();
     void CloseHandles ();
+    void SetErrorFromWorkerThread (const std::wstring& message);
 };
 
 }   // namespace ETWP

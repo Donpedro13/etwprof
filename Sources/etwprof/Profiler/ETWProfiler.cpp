@@ -53,6 +53,9 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     if (m_targetPID == 0)
         throw InitException (L"Target PID is invalid!");
 
+    if (m_options & StackCache && GetWinVersion() < BaseWinVersion::Win8)
+		throw InitException (L"ETW stack caching is requested, but Windows version is less than 8!");
+
     m_hTargetProcess = OpenProcess (SYNCHRONIZE | PROCESS_QUERY_INFORMATION, FALSE, target);
 
     if (m_hTargetProcess == nullptr)
@@ -331,14 +334,11 @@ void ETWProfiler::Profile ()
                                      m_targetPID,
                                      bool (m_options & RecordCSwitches) };
 
-    if (ETWP_ERROR (!filterData.userProviders.empty () && GetWinVersion () < BaseWinVersion::Win8)) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+	if (GetWinVersion () < BaseWinVersion::Win8 && !filterData.userProviders.empty ()) {
+		SetErrorFromWorkerThread (L"User providers are requested, but Windows version is less than 8!");
 
-        m_result = ResultCode::Error;
-        m_errorFromWorkerThread = L"User providers are requested, but Windows version is less than 8!";
-
-        return;
-    }
+		return;
+	}
 
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;
@@ -355,10 +355,7 @@ void ETWProfiler::Profile ()
                                          m_options & Compress);
 
         if (ETWP_ERROR (!m_ETWSession->Start ())) {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-            m_result = ResultCode::Error;
-            m_errorFromWorkerThread = L"Unable to start ETW session!";
+            SetErrorFromWorkerThread (L"Unable to start ETW session!");
 
             return;
         }
@@ -387,10 +384,7 @@ void ETWProfiler::Profile ()
                                              static_cast<DWORD> (eventIDArray.size ()) *
                                                 sizeof (CLASSIC_EVENT_ID)) != ERROR_SUCCESS))
         {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-            m_result = ResultCode::Error;
-            m_errorFromWorkerThread = L"Unable to request stack traces for ETW session!";
+            SetErrorFromWorkerThread (L"Unable to request stack traces for ETW session!");
 
             return;
         }
@@ -403,25 +397,19 @@ void ETWProfiler::Profile ()
                                                              providerInfo.level,
                                                              providerInfo.flags)))
             {
-                LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-                m_result = ResultCode::Error;
-
                 std::wstring guidString = L"UNKNOWN PROVIDER";
                 GUIDToString (providerInfo.providerID, &guidString);
-                m_errorFromWorkerThread = L"Failed to enable user provider: " + guidString;
+                SetErrorFromWorkerThread (L"Failed to enable user provider: " + guidString);
 
                 return;
             }
         }
 
         if (m_options & StackCache) {
-            if (ETWP_ERROR (!EnableStackCachingForSession (m_ETWSession->GetNativeHandle (), 8 * 1'024 * 1'024, 2'039))) {
-				LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-				m_result = ResultCode::Error;
-
-				m_errorFromWorkerThread = L"Failed to enable stack caching for ETW session!";
+            if (ETWP_ERROR (!EnableStackCachingForSession (m_ETWSession->GetNativeHandle (),
+                                                           40 * 1'024 * 1'024, 40'961)))
+            {
+                SetErrorFromWorkerThread (L"Failed to enable stack caching for ETW session!");
 
 				return;
             }
@@ -429,10 +417,7 @@ void ETWProfiler::Profile ()
 
         std::wstring errorMsg;
         if (ETWP_ERROR (!filteringRelogger.AddRealTimeSession (*m_ETWSession.get (), &errorMsg))) {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-            m_result = ResultCode::Error;
-            m_errorFromWorkerThread = L"Unable to add ETW session to filter relogger: " + errorMsg;
+            SetErrorFromWorkerThread (L"Unable to add ETW session to filtering relogger: " + errorMsg);
 
             return;
         }
@@ -442,10 +427,7 @@ void ETWProfiler::Profile ()
 
         // This will call back FilterEventForProfiling
         if (ETWP_ERROR (!filteringRelogger.StartRelogging (&errorMsg))) {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-            m_result = ResultCode::Error;
-            m_errorFromWorkerThread = L"Unable to start relogger: " + errorMsg;
+            SetErrorFromWorkerThread (L"Unable to start relogger: " + errorMsg);
 
             return;
         }
@@ -453,10 +435,7 @@ void ETWProfiler::Profile ()
         // At this point, the session should be stopped, so no need for this
         etwSessionDestroyer.Deactivate ();
     } catch (const TraceRelogger::InitException& e) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-        m_result = ResultCode::Error;
-        m_errorFromWorkerThread = L"Unable to construct filtering relogger: " + e.GetMsg ();
+        SetErrorFromWorkerThread (L"Unable to construct filtering relogger: " + e.GetMsg ());
 
         return;
     }
@@ -476,10 +455,7 @@ void ETWProfiler::Profile ()
 
     std::wstring mergeErrorMsg;
     if (ETWP_ERROR (!MergeTrace (rawOutputPath, mergeFlags, outputPath, &mergeErrorMsg))) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
-
-        m_result = ResultCode::Error;
-        m_errorFromWorkerThread = L"Debug info merge failed: " + mergeErrorMsg;
+        SetErrorFromWorkerThread (L"Debug info merge failed: " + mergeErrorMsg);
 
         return;
     }
@@ -503,6 +479,14 @@ void ETWProfiler::CloseHandles ()
         CloseHandle (m_hWorkerThread);
         m_hWorkerThread = nullptr;
     }
+}
+
+void ETWProfiler::SetErrorFromWorkerThread (const std::wstring& message)
+{
+	LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+
+	m_result = ResultCode::Error;
+	m_errorFromWorkerThread = message;
 }
 
 }   // namespace ETWP

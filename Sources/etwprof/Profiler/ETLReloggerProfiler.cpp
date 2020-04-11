@@ -39,6 +39,9 @@ ETLReloggerProfiler::ETLReloggerProfiler (const std::wstring& inputPath,
     if (m_targetPID == 0)
         throw InitException (L"Target PID is invalid!");
 
+    if (m_options & StackCache)
+        throw InitException (L"ETW stack caching is not supported by ETLReloggerProfiler!");
+
     if (IsProcessElevated ()) {
         Log (LogSeverity::Info,
              L"You are running elevated, but ETLReloggerProfiler does not require administrative privileges!");
