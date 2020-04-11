@@ -5,15 +5,15 @@
 
 namespace ETWP {
 
-// Lockable: a class that has these two methods:
-//   - void Lock ()
-//   - void Unlock ()
-template <class Lockable>
+template<typename T>
+concept Lockable = requires (T t) { t.Lock (); t.Unlock (); };
+
+template <class T> requires Lockable<T>
 class LockableGuard final {
 public:
     ETWP_DISABLE_COPY_AND_MOVE (LockableGuard);
 
-    LockableGuard (Lockable* lockable):
+    LockableGuard (T* lockable):
         m_lockable (lockable),
         m_shouldUnlock (true)
     {
@@ -33,8 +33,8 @@ public:
     }
 
 private:
-    Lockable* m_lockable;
-    bool      m_shouldUnlock;
+    T*   m_lockable;
+    bool m_shouldUnlock;
 };
 
 }   // namespace ETWP

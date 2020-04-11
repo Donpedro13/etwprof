@@ -50,7 +50,7 @@ ETLReloggerProfiler::ETLReloggerProfiler (const std::wstring& inputPath,
 
 ETLReloggerProfiler::~ETLReloggerProfiler ()
 {
-    LockableGuard<CriticalSection> guard (&m_lock);
+    LockableGuard guard (&m_lock);
 
     if (m_profiling)
         Stop ();
@@ -61,7 +61,7 @@ ETLReloggerProfiler::~ETLReloggerProfiler ()
 
 bool ETLReloggerProfiler::Start (std::wstring* pErrorOut)
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (ETWP_ERROR (m_profiling))
         return false;
@@ -84,7 +84,7 @@ bool ETLReloggerProfiler::Start (std::wstring* pErrorOut)
 
     m_profiling = true;
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     m_result = ResultCode::Running;
 
     return true;
@@ -92,22 +92,22 @@ bool ETLReloggerProfiler::Start (std::wstring* pErrorOut)
 
 void ETLReloggerProfiler::Stop ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     StopImpl ();
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     if (m_result != ResultCode::Error)  // Stopping can result in an error; do not change the result in this case
         m_result = ResultCode::Stopped;
 }
 
 void ETLReloggerProfiler::Abort ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     StopImpl ();
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     // Stopping can result in an error, but we discard the result anyways, so we don't care if we overwrite the error
     //   state with ResultCode::Aborted
     m_result = ResultCode::Aborted;
@@ -115,10 +115,10 @@ void ETLReloggerProfiler::Abort ()
 
 bool ETLReloggerProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (!m_profiling) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         *pResultOut = m_result;
 
@@ -134,7 +134,7 @@ bool ETLReloggerProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErr
     DWORD pollResult = WaitForSingleObject (m_hWorkerThread, 0);
     switch (pollResult) {
         case WAIT_OBJECT_0: {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+            LockableGuard resultLockGuard (&m_resultLock);
 
             m_profiling = false;
             if (m_result == IProfiler::ResultCode::Running || m_result == IProfiler::ResultCode::Unstarted)
@@ -154,7 +154,7 @@ bool ETLReloggerProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErr
     }
 
     if (!m_profiling) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         *pResultOut = m_result;
 
@@ -211,7 +211,7 @@ unsigned int ETLReloggerProfiler::ProfileHelper (void* instance)
 
 void ETLReloggerProfiler::Profile ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
     ProfileFilterData filterData = { {},
@@ -234,7 +234,7 @@ void ETLReloggerProfiler::Profile ()
 
         std::wstring errorMsg;
         if (ETWP_ERROR (!filteringRelogger.AddTraceFile (m_inputPath, &errorMsg))) {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+            LockableGuard resultLockGuard (&m_resultLock);
 
             m_result = ResultCode::Error;
             m_errorFromWorkerThread = L"Unable to add input ETL file to filtering relogger: " + errorMsg;
@@ -247,7 +247,7 @@ void ETLReloggerProfiler::Profile ()
 
         // This will call back FilterEventForProfiling
         if (ETWP_ERROR (!filteringRelogger.StartRelogging (&errorMsg))) {
-            LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+            LockableGuard resultLockGuard (&m_resultLock);
 
             m_result = ResultCode::Error;
             m_errorFromWorkerThread = L"Unable to start relogger: " + errorMsg;
@@ -255,7 +255,7 @@ void ETLReloggerProfiler::Profile ()
             return;
         }
     } catch (const TraceRelogger::InitException& e) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         m_result = ResultCode::Error;
         m_errorFromWorkerThread = L"Unable to construct filtering relogger: " + e.GetMsg ();
@@ -281,7 +281,7 @@ void ETLReloggerProfiler::Profile ()
 
     std::wstring mergeErrorMsg;
     if (ETWP_ERROR (!MergeTrace (rawOutputPath, mergeFlags, outputPath, &mergeErrorMsg))) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         m_result = ResultCode::Error;
         m_errorFromWorkerThread = L"Debug info merge failed: " + mergeErrorMsg;

@@ -96,7 +96,7 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
 
 ETWProfiler::~ETWProfiler ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (m_profiling)
         Stop ();
@@ -108,7 +108,7 @@ ETWProfiler::~ETWProfiler ()
 
 bool ETWProfiler::Start (std::wstring* pErrorOut)
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (ETWP_ERROR (m_profiling))
         return true;
@@ -161,7 +161,7 @@ bool ETWProfiler::Start (std::wstring* pErrorOut)
 
     m_profiling = true;
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     m_result = ResultCode::Running;
 
     return true;
@@ -169,22 +169,22 @@ bool ETWProfiler::Start (std::wstring* pErrorOut)
 
 void ETWProfiler::Stop ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     StopImpl ();
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     if (m_result != ResultCode::Error)  // Stopping can result in an error; do not change the result in this case
         m_result = ResultCode::Stopped;
 }
 
 void ETWProfiler::Abort ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     StopImpl ();
 
-    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+    LockableGuard resultLockGuard (&m_resultLock);
     // Stopping can result in an error, but we discard the result anyways, so we don't care if we overwrite the error
     //   state with ResultCode::Aborted
     m_result = ResultCode::Aborted;
@@ -192,10 +192,10 @@ void ETWProfiler::Abort ()
 
 bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (!m_profiling) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         *pResultOut = m_result;
 
@@ -239,7 +239,7 @@ bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
                 StopImpl ();
 
                 {
-                    LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+                    LockableGuard resultLockGuard (&m_resultLock);
 
                     if (m_result != ResultCode::Error)  // Stopping can result in an error; do not change the result in this case
                         m_result = ResultCode::Finished;
@@ -258,7 +258,7 @@ bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
     }
 
     if (!m_profiling) {
-        LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+        LockableGuard resultLockGuard (&m_resultLock);
 
         *pResultOut = m_result;
 
@@ -271,7 +271,7 @@ bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
 
 bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo)
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     if (ETWP_ERROR (m_profiling))
         return false;
@@ -325,7 +325,7 @@ void ETWProfiler::StopImpl ()
 
 void ETWProfiler::Profile ()
 {
-    LockableGuard<CriticalSection> lockGuard (&m_lock);
+    LockableGuard lockGuard (&m_lock);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
     ProfileFilterData filterData = { { 1024 },
@@ -362,7 +362,7 @@ void ETWProfiler::Profile ()
 
         OnExit etwSessionDestroyer ([&]() {
             // We could exit ETWProfiler::Profile when the lock is unowned, so we need this
-            LockableGuard<CriticalSection> guard (&m_lock);
+            LockableGuard guard (&m_lock);
 
             m_ETWSession->Stop ();
         });
@@ -483,7 +483,7 @@ void ETWProfiler::CloseHandles ()
 
 void ETWProfiler::SetErrorFromWorkerThread (const std::wstring& message)
 {
-	LockableGuard<CriticalSection> resultLockGuard (&m_resultLock);
+	LockableGuard resultLockGuard (&m_resultLock);
 
 	m_result = ResultCode::Error;
 	m_errorFromWorkerThread = message;
