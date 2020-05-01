@@ -195,12 +195,18 @@ ConsoleOStream& ConsoleOStream::operator<< (OStreamManipulator manipulator)
 
 void ConsoleOStream::ResetColors ()
 {
+    if (m_type != Type::Console)
+        return;
+
     ResetForegroundColor ();
     ResetBackgroundColor ();
 }
 
 void ConsoleOStream::SetForegroundColor (ConsoleColor newColor)
 {
+	if (m_type != Type::Console)
+		return;
+
     ResetForegroundColor ();
 
     CONSOLE_SCREEN_BUFFER_INFO consoleBufferInfo;
@@ -214,6 +220,9 @@ void ConsoleOStream::SetForegroundColor (ConsoleColor newColor)
 
 void ConsoleOStream::SetBackgroundColor (ConsoleColor newColor)
 {
+	if (m_type != Type::Console)
+		return;
+
     CONSOLE_SCREEN_BUFFER_INFO consoleBufferInfo;
     GetConsoleScreenBufferInfo (m_stdHandle, &consoleBufferInfo);
 
@@ -225,6 +234,9 @@ void ConsoleOStream::SetBackgroundColor (ConsoleColor newColor)
 
 void ConsoleOStream::ResetForegroundColor ()
 {
+	if (m_type != Type::Console)
+		return;
+
     CONSOLE_SCREEN_BUFFER_INFO consoleBufferInfo;
     GetConsoleScreenBufferInfo (m_stdHandle, &consoleBufferInfo);
     WORD newAttributes = ClearForegroundColor (consoleBufferInfo.wAttributes);
@@ -235,6 +247,9 @@ void ConsoleOStream::ResetForegroundColor ()
 
 void ConsoleOStream::ResetBackgroundColor ()
 {
+	if (m_type != Type::Console)
+		return;
+
     CONSOLE_SCREEN_BUFFER_INFO consoleBufferInfo;
     GetConsoleScreenBufferInfo (m_stdHandle, &consoleBufferInfo);
     WORD newAttributes = ClearBackgroundColor (consoleBufferInfo.wAttributes);
