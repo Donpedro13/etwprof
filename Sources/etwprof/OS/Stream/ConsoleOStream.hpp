@@ -23,6 +23,13 @@ public:
         Environment  // Console's CP or CP_ACP
     };
 
+    enum class Type {
+        Console,
+        File,
+        Pipe,
+        Other
+    };
+
     explicit ConsoleOStream (StdHandle handle,
                              Encoding encoding = Encoding::Automatic);
 
@@ -30,7 +37,7 @@ public:
     ConsoleOStream () = delete;
     ETWP_DISABLE_COPY_AND_MOVE (ConsoleOStream);
 
-    bool IsOfConsoleType () const;
+    Type GetType () const;
 
     void Write (const std::wstring& string);
     void WriteLine (const std::wstring& string);
@@ -52,6 +59,8 @@ public:
 private:
     HANDLE   m_stdHandle = INVALID_HANDLE_VALUE;
     Encoding m_encoding;
+    Type     m_type;
+
     WORD     m_origBgColor;
     WORD     m_origFgColor;
 
@@ -60,6 +69,7 @@ private:
 
 
     void ResolveEncoding ();
+    void InitType ();
 
     // These functions are helpers; they are not meant to convert
     void WriteBytesThroughFile (const void* pBytes, DWORD nBytes);

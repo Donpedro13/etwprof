@@ -96,6 +96,7 @@ ConsoleOStream::ConsoleOStream (StdHandle handle,
     if (ETWP_ERROR (m_stdHandle == INVALID_HANDLE_VALUE))
         throw std::runtime_error ("GetStdHandle returned INVALID_HANDLE_VALUE");
 
+    InitType ();
     ResolveEncoding ();
 
     CONSOLE_SCREEN_BUFFER_INFO consoleBufferInfo;
@@ -105,25 +106,15 @@ ConsoleOStream::ConsoleOStream (StdHandle handle,
     m_origFgColor = consoleBufferInfo.wAttributes & kForegroundBits;
 }
 
-bool ConsoleOStream::IsOfConsoleType () const
+ConsoleOStream::Type ConsoleOStream::GetType () const
 {
-    static bool cached;
-    static bool value;
-
-    // We cache the result; if the handle changes during the exectuion of the
-    //  program, this could result in incorrect behavior.
-    if (!cached) {
-        value = GetFileType (m_stdHandle) == FILE_TYPE_CHAR;
-        cached = true;
-    }
-    
-    return value;
+    return m_type;
 }
 
 void ConsoleOStream::Write (const std::wstring& string)
 {
     if (m_encoding == Encoding::UTF_16) {
-        if (IsOfConsoleType ()) {
+        if (GetType () == Type::Console) {
             WriteUTF16ThroughConsole (string.c_str ());
         } else {
             WriteBytesThroughFile (string.c_str (),
@@ -133,16 +124,16 @@ void ConsoleOStream::Write (const std::wstring& string)
         // If someone writes to the console (and not a file or pipe)
         //   using UTF-8, that could only possibly work if the code page is
         //   UTF-8. That's so uncommon that it's worth an assert.
-        ETWP_ASSERT (!IsOfConsoleType ());
+        ETWP_ASSERT (GetType () != Type::Console);
 
         std::unique_ptr<char> pBuffer = UTF16ToMultiByte (CP_UTF8, string.c_str ());
 
-        if (IsOfConsoleType ())
+        if (GetType () == Type::Console)
             WriteANSIThroughConsole (pBuffer.get ());
         else
             WriteBytesThroughFile (pBuffer.get (), static_cast<DWORD> (strlen (pBuffer.get ())));
     } else if (m_encoding == Encoding::Environment) {
-        if (IsOfConsoleType ()) {
+        if (GetType () == Type::Console) {
             std::unique_ptr<char> pBuffer = UTF16ToMultiByte (GetConsoleOutputCP (), string.c_str ());
 
             WriteANSIThroughConsole (pBuffer.get ());
@@ -267,9 +258,32 @@ void ConsoleOStream::ResolveEncoding ()
     if (m_encoding != Encoding::Automatic)
         return;
 
-    // We output UTF-16 in case of both a "normal" console handle and a
-    //   file/pipe
-    m_encoding = Encoding::UTF_16;
+    // In case of a console, we output UTF-16, UTF-8 otherwise (file, pipe, etc.)
+    switch (GetType ()) {
+        case Type::Console:
+            m_encoding = Encoding::UTF_16;
+
+            break;
+        default:
+			m_encoding = Encoding::UTF_8;
+
+			break;
+    }
+}
+
+void ConsoleOStream::InitType ()
+{
+	DWORD type = GetFileType (m_stdHandle);
+	if (type == FILE_TYPE_DISK) {
+		m_type = Type::File;
+	}
+	else if (type == FILE_TYPE_PIPE) {
+        m_type = Type::Pipe;
+	} else {
+        // Note: FILE_TYPE_CHAR could be other types than just console, so we (ab)use GetConsoleMode instead...
+		DWORD dummy;
+        m_type = GetConsoleMode (m_stdHandle, &dummy) ? Type::Console : Type::Other;
+	}
 }
 
 void ConsoleOStream::WriteBytesThroughFile (const void* pBytes, DWORD nBytes)
