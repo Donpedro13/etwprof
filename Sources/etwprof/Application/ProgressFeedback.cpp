@@ -7,21 +7,29 @@ namespace ETWP {
 
 ProgressFeedback::ProgressFeedback (const std::wstring& process,
                                     const std::wstring& detail,
+                                    Style style,
                                     State initialState /*= State::Idle*/):
-    m_process (process),
+    m_operation (process),
     m_detail (detail),
-    m_state (initialState)
+    m_animated (style == Style::Animated),
+    m_state (initialState),
+    m_currentStatePrinted (false),
+    m_progressCounter (0)
 {
 
 }
 
-void ProgressFeedback::PrintProgress () const
+void ProgressFeedback::PrintProgress ()
 {
-    COut () << L'\r' << ColorReset << m_process;
+    if (m_animated)
+        COut () << L'\r';
+    else if (m_currentStatePrinted)
+        return;
 
-    if (!m_detail.empty ()) {
+    COut () << ColorReset << m_operation;
+
+    if (!m_detail.empty ())
         COut () << L" " << FgColorWhite << m_detail;
-    }
 
     COut () << L'\t' << FgColorCyan << L"[ ";
 
@@ -30,12 +38,13 @@ void ProgressFeedback::PrintProgress () const
             COut () << FgColorGray << L"IDLE";
             break;
         case State::Running: {
-            static uint8_t counter;
             static wchar_t progressMap[] = { L'–', L'\\', L'|', L'/' };
 
-            ++counter;
-
-            COut () << FgColorMagenta << progressMap[counter % 4];
+            COut () << FgColorMagenta;
+            if (m_animated)
+                COut () << progressMap[m_progressCounter++ % 4];
+            else
+                COut () << L"...";
         }
             break;
         case State::Finished:
@@ -52,18 +61,27 @@ void ProgressFeedback::PrintProgress () const
             break;
     }
 
-
     COut () << FgColorCyan << L" ]" << ColorReset;
+
+    if (!m_animated)
+        COut () << Endl;
+
+    m_currentStatePrinted = true;
 }
 
-void ProgressFeedback::PrintProgressLine () const
+void ProgressFeedback::PrintProgressLine ()
 {
     PrintProgress ();
-    COut () << Endl;
+
+    if (m_animated) // In case of Style::Static, a newline was already printed in PrintProgress...
+        COut () << Endl;
 }
 
 void ProgressFeedback::SetState (State newState)
 {
+    if (newState != m_state)
+        m_currentStatePrinted = false;
+
     m_state = newState;
 }
 

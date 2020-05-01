@@ -345,8 +345,11 @@ bool Application::DoProfile ()
                                    L"for details.");
     }
 
+    ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?
+                                            ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
     ProgressFeedback feedback (L"Profiling",
                                target.m_name + L" (" + std::to_wstring (target.m_PID) + L")",
+                               feebackStyle,
                                ProgressFeedback::State::Running);
     
     IProfiler::ResultCode result;

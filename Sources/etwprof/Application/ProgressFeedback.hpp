@@ -19,20 +19,30 @@ public:
         Aborted
     };
 
-    ProgressFeedback (const std::wstring& process,
+    enum class Style {
+        Static,
+        Animated
+    };
+
+    ProgressFeedback (const std::wstring& operation,
                       const std::wstring& detail,
+                      Style style,
                       State initialState = State::Idle);
 
-    void PrintProgress () const;
-    void PrintProgressLine () const;
+    void PrintProgress ();
+    void PrintProgressLine ();
 
     void SetState (State newState);
 
 private:
-    std::wstring m_process;
+    std::wstring m_operation;
     std::wstring m_detail;
 
-    State m_state;
+    bool m_animated;
+
+    State   m_state;
+    bool    m_currentStatePrinted;
+    uint8_t m_progressCounter;
 };
 
 }   // namespace ETWP
