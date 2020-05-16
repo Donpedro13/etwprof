@@ -73,5 +73,5 @@ Collects all events from the `Microsoft-Windows-RPC` provider.
 Collects events from TraceLogging provider named `MyTraceloggerProvider`, but only those with a keyword that matches bitmask `0xff`.
 * `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x0200000010000000:4'stack'`  
 Collects events from `Microsoft-Windows-Win32k`, but ignores those **not** matching the specified keyword, and retains events with level 4 and below only. Also collects stack traces.
-* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x10000000:'stack'+Microsoft-Windows-RPC+37f342ed-e45c-4b26-b3fe-450af9817fcd:0xff:0`  
+* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x10000000:'stack'+Microsoft-Windows-RPC+37f342ed-e45c-4b26-b3fe-450af9817fcd:0xff`  
 Enables various providers with various options.
