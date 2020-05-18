@@ -110,6 +110,9 @@ BOOL WINAPI Application::CtrlHandler (DWORD fdwCtrlType)
 
 int Application::Run ()
 {
+    if (m_args.noAction)    // "Hidden" option for testing command line arguments
+        return 0;
+
     if (m_args.verbose)
         SetMinLogSeverity (LogSeverity::Info);
 

@@ -23,3 +23,6 @@ Binaries/
 
 # CMake
 CMakeFiles/
+
+# Python
+*.pyc

@@ -251,7 +251,7 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
     ETWP_ASSERT (!IsAssignmentArg (arg));
 
     std::wstring argName = GetArgName (arg);
-    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache
+    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache ; --noaction
     if (argName == L"help") {
         pArgumentsOut->help = true;
 
@@ -278,6 +278,10 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
         return true;
 	} else if (argName == L"scache") {
 		pArgumentsOut->stackCache = true;
+
+		return true;
+	} else if (argName == L"noaction") {
+		pArgumentsOut->noAction = true;
 
 		return true;
 	}
@@ -840,7 +844,10 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
 
     auto it = finalArguments.cbegin ();
     ++it; // The first argument is expected to be the application path; skip it
-    if (it == finalArguments.cend ()) {
+
+    if (it == finalArguments.cend () ||
+        (finalArguments.size () == 2 && *it == L"--noaction"))   // noaction is "hidden", treat it accordingly
+    {
         LogFailedParse (L"Not enough arguments!");
 
         return false;
@@ -898,6 +905,7 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     pArgumentsOut->cswitch = parsedArgs.cswitch;
     pArgumentsOut->minidump = parsedArgs.minidump;
     pArgumentsOut->stackCache = parsedArgs.stackCache;
+    pArgumentsOut->noAction = parsedArgs.noAction;
 
     // We could check here if both --debug and --verbose was provided, but I don't think we need to be that nitpicky
 
