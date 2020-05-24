@@ -211,6 +211,9 @@ bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
     DWORD pollResult = WaitForSingleObject (m_hWorkerThread, 0);
     switch (pollResult) {
         case WAIT_OBJECT_0:
+            if (m_result == IProfiler::ResultCode::Running) // The kernel session must have been stopped externally
+                m_result = IProfiler::ResultCode::Aborted;
+
             m_profiling = false;
 
             CloseHandles ();
