@@ -84,6 +84,8 @@ def test_profile_erroneous():
     expect_nonzero(_run_command_line_test(["profile", "-t=something.exe", "-o=C:\\Windows"]))   # Folder instead of a file
     expect_nonzero(_run_command_line_test(["profile", "-t=something.exe", "-o=C:\\this_folder_does_not_exist\1.etl"]))
     expect_nonzero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=C:\\this_folder_does_not_exist"]))
+    expect_nonzero(_run_command_line_test(["profile", "-t=123", "-o=C:\\test.etlbadextenstion"]))
+    expect_nonzero(_run_command_line_test(["profile", "-t=123", "--compress=7z", "-o=C:\\test.etl"]))   # etl instead of 7z as extension
 
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--mflags=0"])))   # w/o -m
 
