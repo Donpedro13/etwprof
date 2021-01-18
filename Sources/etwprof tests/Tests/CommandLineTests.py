@@ -71,6 +71,7 @@ def test_profile_command_real_world():
 
 @testcase(suite = _cmd_suite, name = "Argument parsing errors")
 def test_argument_parsing():
+    expect_nonzero(_run_command_line_test(["-"]))
     expect_nonzero(_run_command_line_test(["profile=3", "-t=something.exe", "--outdir=C:"]))
     expect_nonzero(_run_command_line_test(["profile", "-tsomething.exe", "--outdir=C:"]))
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--mflags="])))

@@ -872,6 +872,12 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
     for (;it != finalArguments.cend (); ++it) {
         Log (LogSeverity::Debug, L"Parsing argument: " + *it);
 
+        if (*it == L"-") {
+            LogFailedParse(L"\"-\" is not a valid argument!", *it);
+
+            return false;
+        }
+
         if (IsCommand (*it)) {
             LogFailedParse (L"Command encountered (only arguments are expected at this point)!", *it);
 
