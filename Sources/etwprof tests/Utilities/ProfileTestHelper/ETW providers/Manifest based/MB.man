@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<instrumentationManifest xsi:schemaLocation="http://schemas.microsoft.com/win/2004/08/events eventman.xsd" xmlns="http://schemas.microsoft.com/win/2004/08/events" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:trace="http://schemas.microsoft.com/win/2004/08/events/trace">
+	<instrumentation>
+		<events>
+			<provider name="MBA" guid="{382B5C97-A095-4F52-BBB6-F3B011B33563}" symbol="MB_A" resourceFileName="{{BINPATH}}" messageFileName="{{BINPATH}}" parameterFileName="{{BINPATH}}">
+				<events>
+					<event symbol="A_EventA" value="0" version="0" level="A_Level1" template="Template1" keywords="A_Keyword1 "></event>
+					<event symbol="A_EventB" value="1" version="0" level="A_Level2" template="Template1" keywords="A_Keyword2 "></event>
+					<event symbol="A_EventC" value="2" version="0" level="win:LogAlways" template="Template2" keywords="A_Keyword2 "></event>
+				</events>
+				<levels>
+					<level name="A_Level1" symbol="A_Level1" value="16"></level>
+					<level name="A_Level2" symbol="A_Level2" value="17"></level>
+				</levels>
+				<keywords>
+					<keyword name="A_Keyword1" symbol="A_Keyword1" mask="0x1"></keyword>
+					<keyword name="A_Keyword2" symbol="A_Keyword2" mask="0x2"></keyword>
+				</keywords>
+				<templates>
+					<template tid="Template1">
+						<data name="String1" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Num1" inType="win:UInt16" outType="xs:unsignedShort"></data>
+						<data name="FileTime" inType="win:FILETIME" outType="xs:dateTime"></data>
+						<data name="GUID" inType="win:GUID" outType="xs:GUID"></data>
+					</template>
+					<template tid="Template2">
+						<data name="Bool" inType="win:Boolean" outType="xs:boolean"></data>
+					</template>
+				</templates>
+			</provider>
+			<provider name="MBB" guid="{465646F1-41D0-4BD2-8173-DBF7FF6CC9E2}" symbol="MB_B" resourceFileName="{{BINPATH}}" messageFileName="{{BINPATH}}" parameterFileName="{{BINPATH}}">
+				<events>
+					<event symbol="B_EventA" value="0" version="0" level="B_Level1" template="Template1" keywords="B_Keyword2 "></event>
+					<event symbol="B_EventB" value="1" version="0" level="B_Level2" template="Template1" keywords="B_Keyword1 "></event>
+					<event symbol="B_EventC" value="2" version="0" level="win:LogAlways" template="Template2" keywords="B_Keyword2 B_Keyword1 "></event>
+				</events>
+				<levels>
+					<level name="B_Level1" symbol="B_Level1" value="16"></level>
+					<level name="B_Level2" symbol="B_Level2" value="17"></level>
+				</levels>
+				<keywords>
+					<keyword name="B_Keyword1" symbol="Keyword1" mask="0x20"></keyword>
+					<keyword name="B_Keyword2" symbol="Keyword2" mask="0x200"></keyword>
+				</keywords>
+				<templates>
+					<template tid="Template1">
+						<data name="String1" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Num1" inType="win:UInt16" outType="xs:unsignedShort"></data>
+						<data name="FileTime" inType="win:FILETIME" outType="xs:dateTime"></data>
+						<data name="GUID" inType="win:GUID" outType="xs:GUID"></data>
+					</template>
+					<template tid="Template2">
+						<data name="Bool" inType="win:Boolean" outType="xs:boolean"></data>
+					</template>
+				</templates>
+			</provider>
+		</events>
+	</instrumentation>
+	<localization>
+		<resources culture="en-US">
+			<stringTable>
+				<string id="level.LogAlways" value="Log Always"></string>
+			</stringTable>
+		</resources>
+	</localization>
+</instrumentationManifest>

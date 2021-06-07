@@ -1,8 +1,17 @@
-import sys
-sys.path.append(r".\Framework")
-sys.path.append(r".\Tests")
+def setup_importdirs():
+    import os
+    import sys
+
+    scriptdir = os.path.dirname(os.path.realpath(__file__))
+
+    sys.path.append(os.path.join(scriptdir, "Framework"))
+    sys.path.append(os.path.join(scriptdir, "Tests"))
+
+setup_importdirs()
 
 import os
+import subprocess
+import sys
 import test_framework
 import Tests
 import TestConfig
@@ -92,7 +101,7 @@ class StylishPrinter:
         else:
             print(str, end = "")
 
-def run_tests(etwprof_path, filter):
+def run_tests(testbin_folder_path, filter):
     g_n_suites = 0
     g_n_cases = 0
 
@@ -163,13 +172,12 @@ def run_tests(etwprof_path, filter):
             print(f"{case.full_name} ({diff * 1000:.0f} ms)")
         else:
             for f in case.failures:
-                print(f"{f.description} at {f.location}")
-                print(f"\"{f.expression}\" {f.expression_description}")
+                print(f)
 
             StylishPrinter.print_red("[  FAILED  ] ")
             print(f"{case.full_name} ({diff * 1000:.0f} ms)")
 
-    TestConfig.set_etwprof_path(etwprof_path)
+    TestConfig.set_testbin_folder_path(testbin_folder_path)
 
     runner = test_framework.TestRunner()
     runner.on_start = on_start
@@ -194,27 +202,36 @@ def has_admin_privileges():
 
     return IsUserAnAdmin()
 
-def check_prerequisites(etwprof_path):
+def check_prerequisites(testbin_folder_path):
     if sys.version_info[0] != 3:
         fail("Python 3 is required to run this script!")
 
-    if not os.path.exists(etwprof_path):
-        fail("etwprof path is invalid or does not exist!")
+    if not os.path.exists(testbin_folder_path):
+        fail("Test binary folder path is invalid or does not exist!")
+
+    if not os.path.exists(os.path.join(testbin_folder_path, "etwprof.exe")):
+        fail("etwprof binary is missing from the binary folder!")
 
     if not has_admin_privileges():
         fail("Tests must be run with admin privileges!")
+
+    try:
+        if subprocess.run(["xperf", "/?"], stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL).returncode != 0:
+            raise RuntimeError
+    except (RuntimeError, OSError):
+        fail("xperf must be available and in the path environment variable!")
 
 def main():
     if len(sys.argv) not in (2, 3):
         usage()
         sys.exit(-1)
 
-    etwprof_path = sys.argv[1]
-    check_prerequisites(etwprof_path)
+    testbin_folder_path = sys.argv[1]
+    check_prerequisites(testbin_folder_path)
 
     filter = sys.argv[2] if len(sys.argv) == 3 else "*"
     
-    run_tests(etwprof_path, filter)
+    run_tests(testbin_folder_path, filter)
 
 if __name__ == "__main__":
     main()

@@ -31,7 +31,7 @@ public:
     virtual void Stop () override;
     virtual void Abort () override;
 
-    virtual bool IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut) override;
+    virtual bool IsFinished (State* pResultOut, std::wstring* pErrorOut) override;
 
     virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
 
@@ -51,7 +51,7 @@ private:
     bool                       m_profiling;
     IETWBasedProfiler::Options m_options;
 
-    ResultCode   m_result;
+    State        m_state;
     std::wstring m_errorFromWorkerThread;
 
     void StopImpl ();   // Not thread safe

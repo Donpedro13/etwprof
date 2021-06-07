@@ -9,6 +9,13 @@ from typing import List, Callable, Optional
 _ASSERT_EXPR_REGEX = re.compile(r"(assert_|expect_).*?\((?P<expr>.*)\).*")
 
 class TestFailure:
+    def __init__(self, msg: str):
+        self._msg = msg
+
+    def __str__(self):
+        return self._msg
+
+class TestFailureWithLocation(TestFailure):
     def __init__(self, desc: str, expr_desc: str, nskip = 1, frame_summary_list = None):
         self._desc = desc
         self._expr_desc = expr_desc
@@ -21,6 +28,7 @@ class TestFailure:
             ss = traceback.StackSummary.extract(tb)
         else:
             ss = traceback.StackSummary.from_list(frame_summary_list)
+            ss.reverse()
 
         frame_of_interest = ss[1 + nskip]
         self._expr = frame_of_interest.line
@@ -34,9 +42,11 @@ class TestFailure:
         if match:
             self._expr = match.group("expr")
 
+        super().__init__ (f"{self.description} at {self.location}\n\t\"{self.expression}\" {self.expression_description}")
+
     @classmethod
     def from_exception(cls, e):
-        return cls("Unhandled exception", f"raised an exception of type {type(e).__name__}", frame_summary_list = traceback.extract_tb(e.__traceback__))
+        return cls("Unhandled exception", f"raised an exception of type {type(e).__name__}: {str(e)}", nskip = 0, frame_summary_list = traceback.extract_tb(e.__traceback__))
 
     @property
     def description(self):
@@ -82,7 +92,7 @@ class TestCase:
     def suite(self, suite):
         self._suite = suite
 
-    def add_failure(self, failure: TestFailure):
+    def add_failure(self, failure: TestFailureWithLocation):
         self._failures.append(failure)
 
     def has_failures(self) -> bool:
@@ -102,8 +112,8 @@ class TestCase:
         
         try:
             self._function()
-        except:
-            raise
+        except Exception as e:
+            raise e
         finally:
             if self._fixture:
                 self._fixture.teardown()
@@ -191,7 +201,7 @@ class TestRunner:
                     
                     self.on_case_end(case)
                 except RuntimeError as e:
-                    case.add_failure(TestFailure.from_exception(e))
+                    case.add_failure(TestFailureWithLocation.from_exception(e))
                     self._failed_cases.append(case)
                     
                     self.on_case_end(case)
@@ -214,8 +224,8 @@ class TestRunner:
 def testcase(suite, name, fixture = None):
     def helper(func):
         def testcase_decorator():
-            global _current_case
-            _current_case = case
+            global current_case
+            current_case = case
 
             func.__globals__["fixture"] = fixture
 
@@ -230,7 +240,7 @@ def testcase(suite, name, fixture = None):
 
 class AssertionFailedError(RuntimeError):
     def __init__(self, desc: str):
-        self._failure = TestFailure(ASSERT_MSG, desc, 3)
+        self._failure = TestFailureWithLocation(ASSERT_MSG, desc, 3)
 
         super().__init__(f"{ASSERT_MSG} at {self._failure.location}:\n\"{self._failure.expression}\" {desc}!")
 
@@ -248,15 +258,15 @@ def _assert_true_impl(to_test, fatal):
         if fatal:
             raise AssertionFailedError(DESC)
         else:
-            _current_case.add_failure(TestFailure(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
+            current_case.add_failure(TestFailureWithLocation(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
 
-def _assert_false_impl(to_test):
+def _assert_false_impl(to_test, fatal):
     if to_test:
         DESC = "was not False"
         if fatal:
             raise AssertionFailedError(DESC)
         else:
-            _current_case.add_failure(TestFailure(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
+            current_case.add_failure(TestFailureWithLocation(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
 
 def _assert_zero_impl(to_test, fatal):
     if to_test != 0:
@@ -264,7 +274,7 @@ def _assert_zero_impl(to_test, fatal):
         if fatal:
             raise AssertionFailedError(desc)
         else:
-            _current_case.add_failure(TestFailure(ASSERT_MSG, desc, nskip = IMPL_SKIP))
+            current_case.add_failure(TestFailureWithLocation(ASSERT_MSG, desc, nskip = IMPL_SKIP))
 
 def _assert_nonzero_impl(to_test, fatal):
     if to_test == 0:
@@ -272,13 +282,25 @@ def _assert_nonzero_impl(to_test, fatal):
         if fatal:
             raise AssertionFailedError(DESC)
         else:
-            _current_case.add_failure(TestFailure(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
+            current_case.add_failure(TestFailureWithLocation(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
 
 def assert_true(to_test):
     _assert_true_impl(to_test, True)
 
 def assert_false(to_test):
     _assert_false_impl(to_test, True)
+
+def assert_eq(to_test, value):
+    _assert_true_impl(to_test == value, True)
+
+def assert_neq(to_test, value):
+    _assert_false_impl(to_test != value, True)
+
+def assert_lt(to_test, value):
+    _assert_true_impl(to_test > value, True)
+
+def assert_gt(to_test, value):
+    _assert_false_impl(to_test < value, True)
 
 def assert_zero(to_test):
     _assert_zero_impl(to_test, True)
@@ -292,6 +314,18 @@ def expect_true(to_test):
 def expect_false(to_test):
     _assert_false_impl(to_test, False)
 
+def expect_eq(to_test, value):
+    _assert_true_impl(to_test == value, False)
+
+def expect_neq(to_test, value):
+    _assert_false_impl(to_test != value, False)
+
+def expect_lt(to_test, value):
+    _assert_true_impl(to_test > value, False)
+
+def expect_gt(to_test, value):
+    _assert_false_impl(to_test < value, False)
+
 def expect_zero(to_test):
     _assert_zero_impl(to_test, False)
 
@@ -299,4 +333,4 @@ def expect_nonzero(to_test):
     _assert_nonzero_impl(to_test, False)
 
 test_suites = TestSuiteRegister()
-_current_case = None
+current_case = None

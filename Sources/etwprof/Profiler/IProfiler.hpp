@@ -19,7 +19,7 @@ public:
         virtual ~InitException () = default;
     };
 
-    enum class ResultCode {
+    enum class State {
         Unstarted,
         Running,
         Finished,
@@ -35,8 +35,8 @@ public:
     virtual void Stop () = 0;
     virtual void Abort () = 0;
 
-    // If the ResultCode is Error, an error message will be placed in pErrorOut
-    virtual bool IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut) = 0;
+    // If the State is Error, an error message will be placed in pErrorOut
+    virtual bool IsFinished (State* pResultOut, std::wstring* pErrorOut) = 0;
 };
 
 }   // namespace ETWP

@@ -43,8 +43,7 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     m_samplingRate (samplingRate),
     m_options (static_cast<Options> (options)),
     m_outputPath (outputPath),
-    m_profiling (false),
-    m_result (ResultCode::Unstarted),
+    m_state (State::Unstarted),
     m_errorFromWorkerThread ()
 {
     if (!PathValid (m_outputPath))
@@ -98,19 +97,19 @@ ETWProfiler::~ETWProfiler ()
 {
     LockableGuard lockGuard (&m_lock);
 
-    if (m_profiling)
+    State        dummy1;
+    std::wstring dummy2;
+    if (!IsFinished (&dummy1, &dummy2))
         Stop ();
 
-    // These HANDLEs should be closed by Stop(Impl)
-    ETWP_ASSERT (m_hTargetProcess == nullptr);
-    ETWP_ASSERT (m_hWorkerThread == nullptr);
+    CloseHandles ();
 }
 
 bool ETWProfiler::Start (std::wstring* pErrorOut)
 {
     LockableGuard lockGuard (&m_lock);
 
-    if (ETWP_ERROR (m_profiling))
+    if (ETWP_ERROR (IsProfiling ()))
         return true;
 
     ETWP_ASSERT (pErrorOut != nullptr);
@@ -159,11 +158,6 @@ bool ETWProfiler::Start (std::wstring* pErrorOut)
     Log (LogSeverity::Debug, L"Profiler thread started with TID " +
          std::to_wstring (workerTID));
 
-    m_profiling = true;
-
-    LockableGuard resultLockGuard (&m_resultLock);
-    m_result = ResultCode::Running;
-
     return true;
 }
 
@@ -171,112 +165,66 @@ void ETWProfiler::Stop ()
 {
     LockableGuard lockGuard (&m_lock);
 
-    StopImpl ();
+    SetState (State::Stopped);
 
-    LockableGuard resultLockGuard (&m_resultLock);
-    if (m_result != ResultCode::Error)  // Stopping can result in an error; do not change the result in this case
-        m_result = ResultCode::Stopped;
+    StopImpl ();
 }
 
 void ETWProfiler::Abort ()
 {
     LockableGuard lockGuard (&m_lock);
 
-    StopImpl ();
+    SetState (State::Aborted);
 
-    LockableGuard resultLockGuard (&m_resultLock);
-    // Stopping can result in an error, but we discard the result anyways, so we don't care if we overwrite the error
-    //   state with ResultCode::Aborted
-    m_result = ResultCode::Aborted;
+    StopImpl ();
 }
 
-bool ETWProfiler::IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut)
+bool ETWProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut)
 {
     LockableGuard lockGuard (&m_lock);
 
-    if (!m_profiling) {
+    if (!IsProfiling ()) {
+        if (GetState () == IProfiler::State::Unstarted)
+            return false;   // We're not profiling *yet*
+
+        WaitForProfilerThread ();
+
         LockableGuard resultLockGuard (&m_resultLock);
 
-        *pResultOut = m_result;
+        *pResultOut = m_state;
 
-        if (m_result == IProfiler::ResultCode::Error)
+        if (m_state == IProfiler::State::Error)
             *pErrorOut = m_errorFromWorkerThread;
 
         return true;
     }
 
-    ETWP_ASSERT (m_hWorkerThread != nullptr);
+    // If the profiler thread is still running, poll the target process to see if it has finished yet
+    if (HasTargetProcessExited ()) {
+        SetState (State::Finished);
 
-    // Poll thread
-    DWORD pollResult = WaitForSingleObject (m_hWorkerThread, 0);
-    switch (pollResult) {
-        case WAIT_OBJECT_0:
-            if (m_result == IProfiler::ResultCode::Running) // The kernel session must have been stopped externally
-                m_result = IProfiler::ResultCode::Aborted;
+        StopImpl ();    // Stop the kernel session, wait for the thread to finish
 
-            m_profiling = false;
+		LockableGuard resultLockGuard (&m_resultLock);
 
-            CloseHandles ();
-            break;
-        case WAIT_TIMEOUT:
-            break;
-        case WAIT_FAILED:
-            ETWP_DEBUG_BREAK_STR (L"Wait failed on profiler thread!");
-            // Hope for the best...
-            break;
-        default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
-                                  L"WaitForSingleObject in profiler!");
+        ETWP_ASSERT (m_state != State::Running && m_state != State::Unstarted);
+
+		*pResultOut = m_state;
+
+		if (m_state == State::Error)
+			*pErrorOut = m_errorFromWorkerThread;
+
+        return true;
     }
 
-    // If the profiler thread is still running, poll the target process to see
-    //   if it has finished yet
-    if (m_profiling) {
-        ETWP_ASSERT (m_hTargetProcess != nullptr);
-
-        pollResult = WaitForSingleObject (m_hTargetProcess, 0);
-        switch (pollResult) {
-            case WAIT_OBJECT_0:
-                // If the process finished, we need to stop the profiler thread
-                //   manually
-                StopImpl ();
-
-                {
-                    LockableGuard resultLockGuard (&m_resultLock);
-
-                    if (m_result != ResultCode::Error)  // Stopping can result in an error; do not change the result in this case
-                        m_result = ResultCode::Finished;
-                }
-                break;
-            case WAIT_TIMEOUT:
-                break;
-            case WAIT_FAILED:
-                ETWP_DEBUG_BREAK_STR (L"Wait failed on target process!");
-                // Hope for the best...
-                break;
-            default:
-                ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
-                                      L"WaitForSingleObject in profiler!");
-        }
-    }
-
-    if (!m_profiling) {
-        LockableGuard resultLockGuard (&m_resultLock);
-
-        *pResultOut = m_result;
-
-        if (m_result == IProfiler::ResultCode::Error)
-            *pErrorOut = m_errorFromWorkerThread;
-    }
-
-    return !m_profiling;
+    return false;
 }
 
 bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo)
 {
     LockableGuard lockGuard (&m_lock);
 
-    if (ETWP_ERROR (m_profiling))
+    if (ETWP_ERROR (IsProfiling ()))
         return false;
 
     m_userProviders.push_back (providerInfo);
@@ -297,38 +245,19 @@ unsigned int ETWProfiler::ProfileHelper (void* instance)
 
 void ETWProfiler::StopImpl ()
 {
-    if (ETWP_ERROR (!m_profiling))
-        return;
-
     if (ETWP_ERROR (!m_ETWSession->Stop ())) {
         // We will probably leak an ETW session, which is bad :/
         Log (LogSeverity::Warning, L"Unable to stop ETW session: " + m_ETWSession->GetName () + L"!");
     }
 
-    ETWP_ASSERT (m_hWorkerThread != nullptr);
-    
-    // Wait for profiler thread synchronously
-    DWORD pollResult = WaitForSingleObject (m_hWorkerThread, INFINITE);
-    switch (pollResult) {
-        case WAIT_OBJECT_0:
-            break;
-        case WAIT_FAILED:
-            // Fallthrough
-        case WAIT_TIMEOUT:
-            // Fallthrough
-        default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
-                                  L"WaitForSingleObject in profiler!");
-    }
-
-    CloseHandles ();
-
-    m_profiling = false;
+    WaitForProfilerThread ();
 }
 
 void ETWProfiler::Profile ()
 {
     LockableGuard lockGuard (&m_lock);
+
+    ETWP_DEBUG_ONLY (OnExit stateChecker ([this]() { ETWP_ASSERT (GetState () != State::Running); }));
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
     ProfileFilterData filterData = { { 1024 },
@@ -428,6 +357,8 @@ void ETWProfiler::Profile ()
         // Note: we unlock the lock, so the relogging process can run lock free
         lockGuard.Release ();
 
+        SetState (State::Running);
+
         // This will call back FilterEventForProfiling
         if (ETWP_ERROR (!filteringRelogger.StartRelogging (&errorMsg))) {
             SetErrorFromWorkerThread (L"Unable to start relogger: " + errorMsg);
@@ -435,7 +366,7 @@ void ETWProfiler::Profile ()
             return;
         }
 
-        // At this point, the session should be stopped, so no need for this
+        // At this point, the session must already be stopped, so no need for this
         etwSessionDestroyer.Deactivate ();
     } catch (const TraceRelogger::InitException& e) {
         SetErrorFromWorkerThread (L"Unable to construct filtering relogger: " + e.GetMsg ());
@@ -452,6 +383,21 @@ void ETWProfiler::Profile ()
     if (debug)
         rawETLDeleter.Deactivate ();
 
+	// The kernel session stopped, possible causes:
+	// a.) the target process exited (detected by IsFinished)
+	// b.) profiling was stopped manually (Stop or Abort was called)
+    // c.) the kernel session was stopped externally (outside of etwprof)
+    
+    // Find out if we are up against case "c"
+	if (GetState () == State::Running)
+        SetState (State::Aborted);
+
+    const State currentState = GetState ();
+    ETWP_ASSERT (currentState != State::Running && currentState != State::Unstarted);
+
+    if (currentState == IProfiler::State::Aborted)
+        return;
+
     DWORD mergeFlags = EVENT_TRACE_MERGE_EXTENDED_DATA_IMAGEID | EVENT_TRACE_MERGE_EXTENDED_DATA_EVENT_METADATA;
     if (compress)
         mergeFlags |= EVENT_TRACE_MERGE_EXTENDED_DATA_COMPRESS_TRACE;
@@ -462,6 +408,13 @@ void ETWProfiler::Profile ()
 
         return;
     }
+}
+
+bool ETWProfiler::IsProfiling ()
+{
+	LockableGuard resultLockGuard (&m_resultLock);
+
+	return m_state == State::Running;
 }
 
 std::wstring ETWProfiler::GenerateETWSessionName ()
@@ -488,8 +441,65 @@ void ETWProfiler::SetErrorFromWorkerThread (const std::wstring& message)
 {
 	LockableGuard resultLockGuard (&m_resultLock);
 
-	m_result = ResultCode::Error;
+	m_state = State::Error;
 	m_errorFromWorkerThread = message;
+}
+
+void ETWProfiler::SetState (State newState)
+{
+	LockableGuard resultLockGuard (&m_resultLock);
+
+	m_state = newState;
+}
+
+IProfiler::State ETWProfiler::GetState ()
+{
+	LockableGuard resultLockGuard (&m_resultLock);
+
+    State result = m_state;
+
+    return result;
+}
+
+bool ETWProfiler::HasTargetProcessExited ()
+{
+    ETWP_ASSERT (m_hTargetProcess != nullptr);
+
+    DWORD pollResult = WaitForSingleObject (m_hTargetProcess, 0);
+    switch (pollResult) {
+        case WAIT_OBJECT_0:
+            return true;
+            break;
+        case WAIT_TIMEOUT:
+            break;
+        case WAIT_FAILED:
+            ETWP_DEBUG_BREAK_STR (L"Wait failed on target process!");
+            // Hope for the best...
+            break;
+        default:
+            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from WaitForSingleObject in profiler!");
+    }
+
+    return false;
+}
+
+void ETWProfiler::WaitForProfilerThread ()
+{
+	ETWP_ASSERT (m_hWorkerThread != nullptr);
+
+	// Wait for profiler thread synchronously
+	DWORD pollResult = WaitForSingleObject (m_hWorkerThread, INFINITE);
+	switch (pollResult) {
+		case WAIT_OBJECT_0:
+			break;
+		case WAIT_FAILED:
+			// Fallthrough
+		case WAIT_TIMEOUT:
+			// Fallthrough
+		default:
+			ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
+				L"WaitForSingleObject in profiler!");
+	}
 }
 
 }   // namespace ETWP

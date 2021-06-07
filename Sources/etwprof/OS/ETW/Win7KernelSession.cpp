@@ -16,9 +16,8 @@ Win7KernelSession::Win7KernelSession (ULONG kernelFlags):
 
 Win7KernelSession::~Win7KernelSession ()
 {
-    if (m_started) {
-        ETWP_VERIFY (StopETWSession (m_handle, KERNEL_LOGGER_NAMEW, m_properties.get ()));
-    }
+    if (m_started)
+        StopETWSession (m_handle, KERNEL_LOGGER_NAMEW, m_properties.get ());
 }
 
 std::wstring Win7KernelSession::GetName () const

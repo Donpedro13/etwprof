@@ -20,7 +20,7 @@ Win8PlusKernelSession::Win8PlusKernelSession (const std::wstring& name, ULONG ke
 Win8PlusKernelSession::~Win8PlusKernelSession ()
 {
     if (m_started)
-        ETWP_VERIFY (StopETWSession (m_handle, m_name, m_properties.get ()));
+        StopETWSession (m_handle, m_name, m_properties.get ());
 }
 
 std::wstring Win8PlusKernelSession::GetName () const
@@ -36,10 +36,10 @@ bool Win8PlusKernelSession::Start ()
     // On Windows 8 and later, there can be more than one kernel logger, and with custom session names (but an extra
     //   flag, EVENT_TRACE_SYSTEM_LOGGER_MODE has to be present; yeah, not that it took me days to figure that out...)
     m_started = StartRealTimeETWSession (m_name,
-                                 EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE,
-                                 m_flags,
-                                 &m_handle,
-                                 &m_properties);
+                                         EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE,
+                                         m_flags,
+                                         &m_handle,
+                                         &m_properties);
 
     return m_started;
 }
@@ -49,12 +49,9 @@ bool Win8PlusKernelSession::Stop ()
     if (ETWP_ERROR (!m_started))
         return true;
 
-    bool success = ControlTraceW (m_handle, m_name.c_str (), m_properties.get (), EVENT_TRACE_CONTROL_STOP) ==
-        ERROR_SUCCESS;
+    m_started = !StopETWSession (m_handle, m_name, m_properties.get ());
 
-    m_started = !success;
-
-    return success;
+    return !m_started;
 }
 
 TRACEHANDLE Win8PlusKernelSession::GetNativeHandle () const

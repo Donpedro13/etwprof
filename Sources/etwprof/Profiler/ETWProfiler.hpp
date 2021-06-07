@@ -23,7 +23,7 @@ class TraceRelogger;
 //   using ETW
 class ETWProfiler final : public IETWBasedProfiler {
 public:
-    // Meaning of ResultCode values:
+    // Meaning of State values:
     //   Unstarted      ->  Initialized, but not started yet
     //   Running        ->  Target is being profiled
     //   Finished       ->  Target process exited
@@ -41,7 +41,7 @@ public:
     virtual void Stop () override;
     virtual void Abort () override;
 
-    virtual bool IsFinished (ResultCode* pResultOut, std::wstring* pErrorOut) override;
+    virtual bool IsFinished (State* pResultOut, std::wstring* pErrorOut) override;
 
     virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
 
@@ -69,9 +69,7 @@ private:
     IETWBasedProfiler::Options m_options;
     std::wstring               m_outputPath;
 
-    bool m_profiling;
-
-    ResultCode   m_result;
+    State m_state;
     std::wstring m_errorFromWorkerThread;
 
     static unsigned int ProfileHelper (void* instance);
@@ -79,10 +77,17 @@ private:
     void StopImpl ();   // Not thread safe
 
     void Profile ();
+    bool IsProfiling ();
 
     std::wstring GenerateETWSessionName ();
-    void CloseHandles ();
-    void SetErrorFromWorkerThread (const std::wstring& message);
+    void CloseHandles ();   // Not thread safe
+
+    void  SetErrorFromWorkerThread (const std::wstring& message);
+    void  SetState (State newState);
+    State GetState ();
+
+    bool HasTargetProcessExited (); // Not thread safe
+    void WaitForProfilerThread ();  // Not thread safe
 };
 
 }   // namespace ETWP

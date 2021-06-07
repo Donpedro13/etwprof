@@ -355,9 +355,9 @@ bool Application::DoProfile ()
                                feebackStyle,
                                ProgressFeedback::State::Running);
     
-    IProfiler::ResultCode result;
+    IProfiler::State state;
     std::wstring profilingErrorMsg;
-    while (!m_pProfiler->IsFinished (&result, &profilingErrorMsg)) {
+    while (!m_pProfiler->IsFinished (&state, &profilingErrorMsg)) {
         feedback.PrintProgress ();
 
         constexpr DWORD kProgressFrequencyMs = 500;
@@ -367,15 +367,15 @@ bool Application::DoProfile ()
     consoleCtrlHandlerRemover.Trigger ();
 
     // Profiling exited; update feedback accordingly
-    switch (result) {
-        case IProfiler::ResultCode::Finished:
-        case IProfiler::ResultCode::Stopped:
+    switch (state) {
+        case IProfiler::State::Finished:
+        case IProfiler::State::Stopped:
             feedback.SetState (ProgressFeedback::State::Finished);
             break;
-        case IProfiler::ResultCode::Aborted:
+        case IProfiler::State::Aborted:
             feedback.SetState (ProgressFeedback::State::Aborted);
             break;
-        case IProfiler::ResultCode::Error:
+        case IProfiler::State::Error:
             feedback.SetState (ProgressFeedback::State::Error);
             break;
         default:
@@ -386,7 +386,7 @@ bool Application::DoProfile ()
 
     feedback.PrintProgressLine ();
 
-    if (result == IProfiler::ResultCode::Error) {
+    if (state == IProfiler::State::Error) {
         Log (LogSeverity::Error, L"Profiling finished with an error: " + profilingErrorMsg);
 
         return false;
@@ -445,7 +445,7 @@ bool Application::DoProfile ()
         }
     }
 
-    if (result == IProfiler::ResultCode::Finished)
+    if (state == IProfiler::State::Finished)
         Log (LogSeverity::Info, L"Profiling finished because the target process exited!");
     else
         Log (LogSeverity::Info, L"Profiling finished because it was stopped manually!");
