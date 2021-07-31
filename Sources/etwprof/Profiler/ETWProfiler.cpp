@@ -260,7 +260,7 @@ void ETWProfiler::Profile ()
     ETWP_DEBUG_ONLY (OnExit stateChecker ([this]() { ETWP_ASSERT (GetState () != State::Running); }));
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
-    ProfileFilterData filterData = { { 1024 },
+    ProfileFilterData filterData = { { },
                                      { m_userProviders.begin (), m_userProviders.end () },
                                      {},
                                      m_targetPID,
@@ -301,7 +301,7 @@ void ETWProfiler::Profile ()
 
         // We need stack traces for: - sampled profile
         //                           - ready thread and context switch (if we collect context switch data)
-        std::vector<CLASSIC_EVENT_ID> eventIDArray (10);
+        std::vector<CLASSIC_EVENT_ID> eventIDArray;
         eventIDArray.push_back ({ PerfInfoGuid, ETWConstants::SampledProfileOpcode, {} });
 
         if (m_options & RecordCSwitches) {
