@@ -20,14 +20,14 @@ class Win32NamedEvent:
         CreateEventW.argtypes = [LPVOID, BOOL, BOOL, LPCWSTR]
         CreateEventW.restype = HANDLE
 
-        self.handle = CreateEventW(0, True, False, name)
+        self._handle = CreateEventW(0, True, False, name)
 
         if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS and not create_or_open:
             self._cleanup()
 
             raise RuntimeError(f"Win32 event with name \"{name}\" already exists!")
 
-        if self.handle == HANDLE(INVALID_HANDLE_VALUE):
+        if self._handle == HANDLE(INVALID_HANDLE_VALUE):
             raise RuntimeError("CreateEventW returned INVALID_HANDLE_VALUE")
 
     def wait(self):
@@ -41,7 +41,7 @@ class Win32NamedEvent:
         WaitForSingleObject.argtypes = [HANDLE, DWORD]
         WaitForSingleObject.restype = DWORD
 
-        result = WaitForSingleObject(self.handle, INFINITE)
+        result = WaitForSingleObject(self._handle, INFINITE)
         if result != WAIT_OBJECT_0:
             raise RuntimeError(f"Value other than WAIT_OBJECT_0 is returned from WaitForSingleObject: {result}!")
 
@@ -53,7 +53,7 @@ class Win32NamedEvent:
         SetEvent.argtypes = [HANDLE]
         SetEvent.restype = BOOL
 
-        if not SetEvent(self.handle):
+        if not SetEvent(self._handle):
             raise RuntimeError(f"SetEvent failed with error {ctypes.windll.kernel32.GetLastError()}!")
 
     def __enter__(self):
@@ -66,43 +66,51 @@ class Win32NamedEvent:
         self._cleanup()
 
     def _cleanup(self):
-        if self.handle:
-            ctypes.windll.kernel32.CloseHandle(self.handle)
-            self.handle = None
+        if self._handle:
+            ctypes.windll.kernel32.CloseHandle(self._handle)
+            self._handle = None
 
 class AsyncTimeoutedProcess:
     def __init__(self, exe, args = [], timeout = None, stdout = subprocess.DEVNULL):
         merged_cmdline = " ".join(itertools.chain([exe], args))
-        self.process = subprocess.Popen(merged_cmdline, stdout = stdout)
-        self.exe = exe
+        self._process = subprocess.Popen(merged_cmdline, stdout = stdout)
+        self._exe = exe
+        
+        self._timeout = timeout
+        self._was_killed = False
 
-        if timeout:
+        if self._timeout:
             import threading
-            threading.Timer(timeout, AsyncTimeoutedProcess.kill_process, self.process)
+            self._timeout_killer = threading.Timer(self._timeout, self.kill)
+            self._timeout_killer.start()
 
     @property
     def pid(self):
-        return self.process.pid
+        return self._process.pid
 
     @property
     def exitcode(self):
-        return self.process.returncode
+        return self._process.returncode
 
     def wait(self):
-        self.process.wait()
+        self._process.wait()
+        self._timeout_killer.cancel()
 
     def check(self):
         self.wait()
 
-        if self.exitcode != 0:
-            raise RuntimeError(f"Process \"{self.exe}\" failed with exit code {self.exitcode}!")
+        if self._was_killed:
+            raise RuntimeError(f"Process \"{self._exe}\" was killed after the timeout of {self._timeout} seconds expired!")
 
-    @staticmethod
-    def kill_process(process):
-        process.kill()
+        if self.exitcode != 0:
+            raise RuntimeError(f"Process \"{self._exe}\" failed with exit code {self.exitcode}!")
+
+    def kill(self):
+        self._process.kill()
+        self._was_killed = True
 
     def __del__(self):
-        self.process.kill()
+        self.kill()
 
 def gracefully_end_every_etwprof_child():
     # This function assumes that every child process that is *not* etwprof will ignore CTRL+C

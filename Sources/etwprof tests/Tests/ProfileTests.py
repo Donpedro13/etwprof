@@ -6,7 +6,6 @@ import subprocess
 import shutil
 from test_framework import *
 from TestUtils import *
-from threading import Timer
 import time
 
 _profile_suite = TestSuite("Profile tests")
@@ -34,18 +33,18 @@ class ProfileTestsFixture(ETWProfFixture):
 class PTHProcess(AsyncTimeoutedProcess):
     def __init__(self, operation):
         super().__init__(os.path.join(TestConfig._testbin_folder_path, "ProfileTestHelper.exe"),
-                       [operation],
-                       timeout = TestConfig.get_process_timeout())
+                         [operation],
+                         timeout = TestConfig.get_process_timeout())
 
         # Native Win32 event used for synchronizing with PTH
         # The test case or operation should start only when etwprof has already started profiling to avoid race
         # conditions. There is still a small window for a race condition this way, but it's negligible. Using another
         # event would solve this problem completely, but that would require etwprof to also signal an event after it has
         # started profiling.
-        self.event = Win32NamedEvent(f"PTH_event_{os.getpid()}_{self.process.pid}", create_or_open = True)
+        self._event = Win32NamedEvent(f"PTH_event_{os.getpid()}_{self._process.pid}", create_or_open = True)
 
     def get_event_for_sync(self):
-        return self.event
+        return self._event
 
 class EtwprofProcess(AsyncTimeoutedProcess):
     def __init__(self, target_pid, outdir_or_file, extra_args = None):
@@ -141,7 +140,7 @@ def test_minidump():
                             _ProfileTestFileExpectation("*.dmp", 1, _DMP_MIN_SIZE)])
 
 @testcase(suite = _profile_suite, name = "5 sec CPU burn", fixture = ProfileTestsFixture())
-def test_minidump():
+def test_5s_cpu_burn():
     _evaluate_simple_profile_test(_perform_profile_test("BurnCPU5s", fixture.outfile), fixture.outfile)
 
 # TODO
