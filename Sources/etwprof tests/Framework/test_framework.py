@@ -294,10 +294,10 @@ def assert_eq(to_test, value):
     _assert_true_impl(to_test == value, True)
 
 def assert_neq(to_test, value):
-    _assert_false_impl(to_test != value, True)
+    _assert_true_impl(to_test != value, True)
 
 def assert_lt(to_test, value):
-    _assert_true_impl(to_test > value, True)
+    _assert_true_impl(to_test < value, True)
 
 def assert_gt(to_test, value):
     _assert_false_impl(to_test < value, True)

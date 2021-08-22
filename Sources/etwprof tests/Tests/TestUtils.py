@@ -77,11 +77,11 @@ class AsyncTimeoutedProcess:
         self._exe = exe
         
         self._timeout = timeout
-        self._was_killed = False
+        self._timeout_reached = False
 
         if self._timeout:
             import threading
-            self._timeout_killer = threading.Timer(self._timeout, self.kill)
+            self._timeout_killer = threading.Timer(self._timeout, self._kill_due_to_timeout)
             self._timeout_killer.start()
 
     @property
@@ -92,6 +92,14 @@ class AsyncTimeoutedProcess:
     def exitcode(self):
         return self._process.returncode
 
+    @property
+    def running(self):
+        return self._process.poll() is None
+
+    @property
+    def timeout_reached(self):
+        return self._timeout_reached
+
     def wait(self):
         self._process.wait()
         self._timeout_killer.cancel()
@@ -99,7 +107,7 @@ class AsyncTimeoutedProcess:
     def check(self):
         self.wait()
 
-        if self._was_killed:
+        if self._timeout_reached:
             raise RuntimeError(f"Process \"{self._exe}\" was killed after the timeout of {self._timeout} seconds expired!")
 
         if self.exitcode != 0:
@@ -107,14 +115,21 @@ class AsyncTimeoutedProcess:
 
     def kill(self):
         self._process.kill()
-        self._was_killed = True
+
+        self._timeout_killer.cancel()
+
+    def _kill_due_to_timeout(self):
+        self._timeout_reached = True
+        self.kill()
 
     def __del__(self):
         self.kill()
 
-def gracefully_end_every_etwprof_child():
-    # This function assumes that every child process that is *not* etwprof will ignore CTRL+C
-    _generate_ctrl_c_event()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.kill()
 
 def run_etwprof(args):
     cmd = [os.path.join(TestConfig._testbin_folder_path, "etwprof.exe")]
@@ -175,30 +190,22 @@ def _get_all_running_etwprof_sessions():
 def _stop_etw_session(name) -> bool:
     return subprocess.run(["xperf", "-stop", name], stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL).returncode == 0
 
-def _stop_etwprof_sessions_if_any():
+def stop_etwprof_sessions_if_any():
     etwprof_sessions = _get_all_running_etwprof_sessions()
     for session_name in etwprof_sessions:
         _stop_etw_session(session_name)
 
     return etwprof_sessions
 
-def _generate_ctrl_c_event():
-    "This function generates a CTRL+C event, which will be sent to every child process"
-
-    try:
-        ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, 0)
-    except KeyboardInterrupt:
-    	pass    # Ignore
-
 class ETWProfFixture:
     def setup(self):
-        stopped_sessions = _stop_etwprof_sessions_if_any()
+        stopped_sessions = stop_etwprof_sessions_if_any()
         if stopped_sessions:
             print("Note: the following (probably leaked) sessions were cleaned up:")
             for session in stopped_sessions:
                 print(f"\t{session}")
 
     def teardown(self):
-        stopped_sessions = _stop_etwprof_sessions_if_any()
+        stopped_sessions = stop_etwprof_sessions_if_any()
         if stopped_sessions:
             test_framework.current_case.add_failure(test_framework.TestFailure(f'Testcase leaked the following ETW session(s): {", ".join(stopped_sessions)}'))

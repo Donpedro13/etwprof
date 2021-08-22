@@ -17,7 +17,7 @@ import Tests
 import TestConfig
 
 def usage():
-    print("Usage:\nRunTests.py <etwprof path> [case/suite filter pattern]")
+    print("Usage:\nRunTests.py <etwprof folder> [case/suite filter pattern]")
 
 class StylishPrinter:
     # ANSI sequences
