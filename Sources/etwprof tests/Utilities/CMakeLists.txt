@@ -1,1 +1,10 @@
 ADD_SUBDIRECTORY(ProfileTestHelper)
+
+include(CheckLanguage)
+CHECK_LANGUAGE(CSharp)
+IF(CMAKE_CSharp_COMPILER)
+	ENABLE_LANGUAGE(CSharp)
+	ADD_SUBDIRECTORY(TraceInfoDumper)
+ELSE()
+	MESSAGE(WARNING "Skipping TraceInfoDumper because no working C# compiler was found")
+ENDIF()
