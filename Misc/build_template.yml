@@ -14,3 +14,4 @@ jobs:
       configuration: ${{ parameters.configuration }}
       clean: true
       msbuildArchitecture: 'x64'
+      restoreNugetPackages: true
