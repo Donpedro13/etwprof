@@ -5,6 +5,11 @@ jobs:
     displayName: 'Generate Solution (CMake)'
     inputs:
       filename: 'GenerateVSSolution.bat'
+  - task: NuGetToolInstaller@1
+  - task: NuGetCommand@2
+    inputs:
+      command: 'restore'
+      restoreSolution: 'IDE\etwprof.sln'
   - task: VSBuild@1
     displayName: 'Build'
     inputs:
