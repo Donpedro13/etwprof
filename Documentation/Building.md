@@ -2,8 +2,8 @@ Building
 ==========
 
 You need the following prerequisites to build etwprof:
-* [CMake](https://cmake.org/) (at least version 3.16)
-* Visual Studio 2019 (or the same version of the [VS Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools))
+* [CMake](https://cmake.org/) (at least version 3.21)
+* Visual Studio 2022 (or the same version of the [VS Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools))
 
 If you have both installed, the easiest way to generate a solution is to run `GenerateVSSolution.bat` in the root folder.
 

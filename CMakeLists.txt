@@ -1,17 +1,17 @@
 # SOURCE_GROUP is used with TREE (avaliable since 3.8.0.)
 # The /diagnostics:caret cl option is used (avaliable since 3.11.0.)
-# Visual Studio 2019 support needed (avaliable since 3.14.0.)
 # TARGET_PRECOMPILE_HEADERS is used (avaliable since 3.16.0.)
-CMAKE_MINIMUM_REQUIRED(VERSION 3.16.0 FATAL_ERROR)
+# Visual Studio 2019 support needed (avaliable since 3.21.0.)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.21.0 FATAL_ERROR)
 
 # Check platform
 IF(NOT WIN32)
 	MESSAGE(FATAL_ERROR "etwprof can only be built on Windows!")
 ENDIF()
 
-# Check for VS 2019 generator
-IF(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio 16 2019")
-    MESSAGE(FATAL_ERROR "Only Visual Studio 2019 projects are supported!")
+# Check for VS 2022 generator
+IF(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio 17 2022")
+    MESSAGE(FATAL_ERROR "Only Visual Studio 2022 projects are supported!")
 ENDIF()
 
 # Check for target bitness

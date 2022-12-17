@@ -8,8 +8,8 @@ mkdir %~dp0IDE || GOTO abort
 pushd %~dp0IDE
 ::Print cmake version
 cmake --version | find /i "version"
-:: Call cmake with the Visual Studio 2019 generator, and use the x64 toolset
-cmake -G "Visual Studio 16 2019" -A "x64" -T host=x64 %~dp0
+:: Call cmake with the Visual Studio 2022 generator, and use the x64 toolset
+cmake -G "Visual Studio 17 2022" -A "x64" -T host=x64 %~dp0
 
 :: Change back to the original current directory
 popd
