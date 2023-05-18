@@ -23,8 +23,3 @@ General limitations
 * Your user must possess the "System Profile Privilege" (`SeSystemProfilePrivilege`). This is needed to turn on sampled profile data collection in the ETW kernel session. Administrators are usually granted this privilege, so chances are you don't have to worry about this.
 * Sampled profiling in an ETW kernel session is interrupt based. This means that only threads actually running on some CPU will be sampled. For example, if your target application has all of its threads blocked (not running) during profiling, nothing will get sampled. In this scenario (potential non-busy hang) a minidump or a regular ETW trace with context switch information will be more useful.
 * etwprof can't start the target process as of yet, so startup scenarios can't be profiled
-
-Known issues
-----------
-
-* Context switch recording (`--cswitch`) does not work reliably

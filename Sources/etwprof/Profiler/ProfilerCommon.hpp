@@ -4,9 +4,12 @@
 #include <windows.h>
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "IETWBasedProfiler.hpp"
+
+#include "OS/Utility/Time.hpp"
 
 struct ITraceEvent;
 class TraceRelogger;
@@ -23,8 +26,47 @@ struct std::hash<ETWP::IETWBasedProfiler::ProviderInfo> {
 
 namespace ETWP {
 
+// Class for recording thread IDs of interest. Besides deleting, you can also mark threads for deletion. These can be
+//   deleted later manually by calling DeleteThreadsMarkedForDeletion, with a time threshold
+class ThreadRegistry {
+public:
+    void Add (DWORD tid);
+    void MarkForDeletion (DWORD tid);
+    void Delete (DWORD tid);
+    bool Contains (DWORD tid) const;
+
+    void DeleteThreadsMarkedForDeletion (TickCount markTimeThreshold);
+
+private:
+    std::unordered_set<DWORD>            m_threadIDs;
+    std::unordered_map<DWORD, TickCount> m_threadIDsMarkedForDeletion;    // TID + tick count when it was marked for deletion
+};
+
+inline void ThreadRegistry::Add (DWORD tid)
+{
+    m_threadIDs.insert (tid);
+}
+
+inline void ThreadRegistry::MarkForDeletion (DWORD tid)
+{
+    m_threadIDsMarkedForDeletion.insert({ tid, GetTickCount ()});
+}
+
+inline void ThreadRegistry::Delete (DWORD tid)
+{
+    m_threadIDs.erase (tid);
+    m_threadIDsMarkedForDeletion.erase (tid);
+}
+
+inline bool ThreadRegistry::Contains (DWORD tid) const
+{
+    return m_threadIDs.contains (tid);
+}
+
 struct ProfileFilterData {
-    std::unordered_set<DWORD> threads;
+    // Unfortunately, sometimes we receive events for a thread *after* their end event. To mitigate this, we keep
+    //   terminated thread ID's around for some time.
+    ThreadRegistry threads;
     // In theory, std::vector should perform better if the number of providers is small. However, my experiments showed
     //   only a very tiny difference, so using a hash set alone should suffice
     std::unordered_set<IETWBasedProfiler::ProviderInfo> userProviders;

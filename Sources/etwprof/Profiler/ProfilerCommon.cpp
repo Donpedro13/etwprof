@@ -70,12 +70,21 @@ bool FilterThreadEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUse
     if (pData->m_processID == pFilterData->targetPID) {
         switch (opcode) {
             case ETWConstants::TStartOpcode:
+                // Thread start events shouldn't be too frequent, so this is a good opportunity to perform cleanup on
+                //   threads marked for deletion. If there are no such events for a long time (or at all), then cleanup
+                //   is not necessary/urgent, as the number of bookkept threads can not increase (if it does, we will
+                //   get a start event).
+                pFilterData->threads.DeleteThreadsMarkedForDeletion (1_tsec);
+                [[fallthrough]];
+
             case ETWConstants::TDCStartOpcode:
-                pFilterData->threads.insert (pData->m_threadID);
+                pFilterData->threads.Add (pData->m_threadID);
+
                 break;
 
             case ETWConstants::TEndOpcode:
-                pFilterData->threads.erase (pData->m_threadID);
+                pFilterData->threads.MarkForDeletion (pData->m_threadID);
+                [[fallthrough]];
 
             case ETWConstants::TDCEndOpcode:
                 break;
@@ -85,6 +94,13 @@ bool FilterThreadEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUse
         }
 
         return true;
+    } else if (opcode == ETWConstants::TStartOpcode) {
+        // If a recently ended thread's ID of our target gets reassigned to another process's new thread,
+        //    we need to delete that TID from our bookkeping, lest we record irrelevant events
+        if (pFilterData->threads.Contains (pData->m_threadID))
+            pFilterData->threads.Delete (pData->m_threadID);
+
+        return false;
     } else {
         return false;
     }
@@ -96,14 +112,14 @@ bool FilterContextSwitchEvent (UCHAR opcode, ProfileFilterData* pFilterData, voi
         const ETWConstants::ReadyThreadDataStub* pData =
             reinterpret_cast<const ETWConstants::ReadyThreadDataStub*> (pUserData);
 
-        return pFilterData->threads.find (pData->m_readyThreadID) != pFilterData->threads.cend ();
+        return pFilterData->threads.Contains (pData->m_readyThreadID);
     } else if (opcode == ETWConstants::CSwitchOpcode) {
         const ETWConstants::CSwitchDataStub* pData =
             reinterpret_cast<const ETWConstants::CSwitchDataStub*> (pUserData);
 
         // A thread of interest was involved in a context switch
-        return (pFilterData->threads.find (pData->m_newThreadID) != pFilterData->threads.cend () ||
-                pFilterData->threads.find (pData->m_oldThreadID) != pFilterData->threads.cend ());
+        return pFilterData->threads.Contains (pData->m_newThreadID) ||
+               pFilterData->threads.Contains (pData->m_oldThreadID);
     } else {
         return false;
     }
@@ -122,7 +138,7 @@ bool FilterSampledProfileEvent (ProfileFilterData* pFilterData, void* pUserData)
     const ETWConstants::SampledProfileDataStub* pData =
         reinterpret_cast<const ETWConstants::SampledProfileDataStub*> (pUserData);
 
-    return pFilterData->threads.find (pData->m_threadID) != pFilterData->threads.cend ();
+    return pFilterData->threads.Contains (pData->m_threadID);
 }
 
 bool FilterImageLoadEvent (ProfileFilterData* pFilterData, void* pUserData)
@@ -141,6 +157,19 @@ bool FilterUserProviderEvent (ProfileFilterData* pFilterData, const GUID& eventG
 }
 
 }   // namespace
+
+void ThreadRegistry::DeleteThreadsMarkedForDeletion (TickCount markTimeThreshold)
+{
+    std::vector<DWORD> tidsToDelete;
+    for (const auto [tid, deletionMarkTime] : m_threadIDsMarkedForDeletion) {
+        if (GetTickCount() >= deletionMarkTime + markTimeThreshold)
+            tidsToDelete.push_back(tid);
+    }
+
+    for (const auto tid : tidsToDelete) {
+        Delete(tid);
+    }
+}
 
 void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, void* context)
 {

@@ -187,7 +187,7 @@ void Application::PrintUsage () const
     --compress=<c>   Compression method used on output file ("off", "etw", or "7z") [default: "etw"]
     --enable=<args>  Format: (<GUID>|<RegisteredName>|*<Name>)[:KeywordBitmask[:MaxLevel['stack']]][+...]
     --scache         Enable ETW stack caching
-    --cswitch        Collect context switch events as well (beta feature)
+    --cswitch        Collect context switch events as well
     --emulate=<f>    Debugging feature. Do not start a real time ETW session, use an already existing ETL file as input
 )";
 
@@ -339,13 +339,6 @@ bool Application::DoProfile ()
         Log (LogSeverity::Error, L"Starting profiler failed: " + startErrorMsg);
 
         return false;
-    }
-
-    // We can remove this, when we finally figure out what we are doing wrong with context switch recording...
-    if (m_args.cswitch) {
-        Log (LogSeverity::Warning, L"Context switch recording is a BETA feature, and has KNOWN ISSUES. Keep this in mind "
-                                   L"when analyzing the resulting trace. See the \"Known Issues\" page on the GitHub repo "
-                                   L"for details.");
     }
 
     ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?

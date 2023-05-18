@@ -25,7 +25,7 @@ etwprof
     --compress=<c>   Compression method used on output file ("off", "etw", or "7z") [default: "etw"]
     --enable=<args>  Format: (<GUID>|<RegisteredName>|*<Name>)[:KeywordBitmask[:MaxLevel['stack']]][+...]
     --scache         Enable ETW stack caching
-    --cswitch        Collect context switch events as well (beta feature)
+    --cswitch        Collect context switch events as well
     --emulate=<f>    Debugging feature. Do not start a real time ETW session, use an already existing ETL file as input
 ```
 
