@@ -193,6 +193,26 @@ def test_debug_mode():
     _evaluate_profile_test(_perform_profile_test("DoNothing", fixture.outdir, ["--debug"]),
                            [_ProfileTestFileExpectation("*.etl", 2, _ETL_MIN_SIZE),
                             _ProfileTestFileExpectation("*.raw.etl", 1, _ETL_MIN_SIZE)])
+    
+@testcase(suite = _profile_suite, name = "Profiling stopped with CTRL+C", fixture = ProfileTestsFixture())
+def test_ctrl_c_stop():
+    with PTHProcess() as pth, pth.get_event_for_sync() as e, EtwprofProcess(_PTH_EXE_NAME, fixture.outfile) as etwprof:
+        # Let etwprof start profiling
+        time.sleep(.1)
+
+        # Stop etwprof by "pressing" CTRL+C
+        generate_ctrl_c_for_children()
+
+        # Due to CTRL+C, etwprof should finish *before* the profiled process
+        etwprof.check()
+
+        # Now it's time for the PTH process finish its thing
+        e.signal()
+        pth.check()
+        
+
+    _evaluate_profile_test(_list_files_in_dir(fixture.outdir),
+                                   [_ProfileTestFileExpectation("*.etl", 1, _ETL_MIN_SIZE)])
 
 @testcase(suite = _profile_suite, name = "ETW session killed", fixture = ProfileTestsFixture())
 def test_etw_session_killed():
