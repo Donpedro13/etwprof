@@ -16,6 +16,9 @@ out/
 *.vsp
 *.vspx
 
+# VS code
+launch.json
+
 # VS solution/projects folder
 IDE/
 
