@@ -100,10 +100,10 @@ namespace TID
 
                 foreach (IImage image in process.Images)
                 {
-                    if (!Images.ContainsKey(ownProcess))
-                        Images.Add(ownProcess, new List<Image>());
+                    if (!ImagesByProcess.ContainsKey(ownProcess))
+                        ImagesByProcess.Add(ownProcess, new List<Image>());
 
-                    Images[ownProcess].Add (new Image(image.FileName));
+                    ImagesByProcess[ownProcess].Add (new Image(image.FileName));
                 }
             }
         }
@@ -114,10 +114,14 @@ namespace TID
             {
                 Process process = new Process(thread.Process.Id, thread.Process.ImageName);
 
-                if(!Threads.ContainsKey(process))
-                    Threads.Add(process, new List<Thread>());
+                if (!ThreadsByProcess.ContainsKey(process))
+                {
+                    ThreadsByProcess.Add(process, new List<Thread>());
+                }
 
-                Threads[process].Add(new Thread(thread.Id));
+                Thread t = new Thread(thread.Id);
+
+                ThreadsByProcess[process].Add(t);
             }
         }
 
@@ -126,10 +130,10 @@ namespace TID
             foreach (ICpuSample sample in cpuSampleDataSource.Samples)
             {
                 Process process = new Process(sample.Process.Id, sample.Process.ImageName);
-                if (!SampledProfileCounts.ContainsKey(process))
-                    SampledProfileCounts.Add(process, 1);
+                if (!SampledProfileCountsByProcess.ContainsKey(process))
+                    SampledProfileCountsByProcess.Add(process, 1);
                 else
-                    ++SampledProfileCounts[process];
+                    ++SampledProfileCountsByProcess[process];
             }
         }
 
@@ -138,10 +142,10 @@ namespace TID
             void ProcessContextSwitch(IProcess etlProcess)
             {
                 Process process = new Process(etlProcess.Id, etlProcess.ImageName);
-                if (!ContextSwitchCounts.ContainsKey(process))
-                    ContextSwitchCounts.Add(process, 1);
+                if (!ContextSwitchCountsByProcess.ContainsKey(process))
+                    ContextSwitchCountsByProcess.Add(process, 1);
                 else
-                    ++ContextSwitchCounts[process];
+                    ++ContextSwitchCountsByProcess[process];
             }
 
             foreach (IContextSwitch cswitch in cpuSchedulingDataSource.ContextSwitches)
@@ -160,14 +164,26 @@ namespace TID
                         ProcessContextSwitch(cswitch.SwitchOut.Process);
                 }
             }
+
+            foreach (IReadyThreadEvent readyThread in cpuSchedulingDataSource.ReadyThreadEvents)
+            {
+                IProcess iProcess = readyThread.ReadiedThread.Process;
+                Process process = new Process(iProcess.Id, iProcess.ImageName);
+
+                if (!ReadyThreadCountsByProcess.ContainsKey(process))
+                    ReadyThreadCountsByProcess.Add(process, 1);
+                else
+                    ++ReadyThreadCountsByProcess[process];
+            }
         }
 
         public string EtlPath { get; }
 
         public List<Process> Processes { get; } = new List<Process>();
-        public Dictionary<Process, List<Image>> Images { get; } = new Dictionary<Process, List<Image>>();
-        public Dictionary<Process, List<Thread>> Threads { get; } = new Dictionary<Process, List<Thread>>();
-        public Dictionary<Process, int> SampledProfileCounts { get; } = new Dictionary<Process, int>();
-        public Dictionary<Process, int> ContextSwitchCounts { get; } = new Dictionary<Process, int>();
+        public Dictionary<Process, List<Image>> ImagesByProcess { get; } = new Dictionary<Process, List<Image>>();
+        public Dictionary<Process, List<Thread>> ThreadsByProcess { get; } = new Dictionary<Process, List<Thread>>();
+        public Dictionary<Process, int> SampledProfileCountsByProcess { get; } = new Dictionary<Process, int>();
+        public Dictionary<Process, int> ContextSwitchCountsByProcess { get; } = new Dictionary<Process, int>();
+        public Dictionary<Process, int> ReadyThreadCountsByProcess { get; } = new Dictionary<Process, int>();
     }
 }

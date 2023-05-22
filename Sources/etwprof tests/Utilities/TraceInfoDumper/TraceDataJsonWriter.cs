@@ -32,7 +32,7 @@ namespace TID
             writer.WritePropertyName("imageLists");
             writer.WriteStartArray();
 
-            foreach (var item in traceData.Images)
+            foreach (var item in traceData.ImagesByProcess)
             {
                 writer.WriteStartObject();
                 writer.WritePropertyName("process");
@@ -59,7 +59,7 @@ namespace TID
             writer.WritePropertyName("threadLists");
             writer.WriteStartArray();
 
-            foreach (var item in traceData.Threads)
+            foreach (var item in traceData.ThreadsByProcess)
             {
                 writer.WriteStartObject();
                 writer.WritePropertyName("process");
@@ -86,7 +86,7 @@ namespace TID
             writer.WritePropertyName("sampledProfileCounts");
             writer.WriteStartArray();
 
-            foreach (var item in traceData.SampledProfileCounts)
+            foreach (var item in traceData.SampledProfileCountsByProcess)
             {
                 writer.WriteStartObject();
 
@@ -107,7 +107,28 @@ namespace TID
             writer.WritePropertyName("contextSwitchCounts");
             writer.WriteStartArray();
 
-            foreach (var item in traceData.ContextSwitchCounts)
+            foreach (var item in traceData.ContextSwitchCountsByProcess)
+            {
+                writer.WriteStartObject();
+
+                writer.WritePropertyName("process");
+                WriteProcess(writer, item.Key);
+
+                writer.WritePropertyName("count");
+                writer.WriteValue(item.Value);
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
+        private static void WriteReadyThreadCounts(JsonWriter writer, TraceData traceData)
+        {
+            writer.WritePropertyName("readyThreadCounts");
+            writer.WriteStartArray();
+
+            foreach (var item in traceData.ReadyThreadCountsByProcess)
             {
                 writer.WriteStartObject();
 
@@ -142,8 +163,10 @@ namespace TID
 
                         WriteProcesses(writer, data);
                         WriteImages(writer, data);
+                        WriteThreads(writer, data);
                         WriteSampledProfileCounts(writer, data);
                         WriteContextSwitchCounts(writer, data);
+                        WriteReadyThreadCounts(writer, data);
 
                     writer.WriteEndObject();
                 writer.WriteEndObject();
