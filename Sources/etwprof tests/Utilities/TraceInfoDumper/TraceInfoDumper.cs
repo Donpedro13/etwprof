@@ -1,6 +1,6 @@
 /* This tool is a small utility used in the testing of etwprof. It takes an input ETL file path parameter, extracts 
- * some data, and dumps that to an an XML file. For processing ETL files it utilizes the TraceProcessor library by
- * Microsoft (that's why it's * written in C#, and not C++).
+ * some data, and dumps that to an a JSON file. For processing ETL files it utilizes the TraceProcessor library by
+ * Microsoft (that's why it's written in C#, and not C++).
  */
 
 using Microsoft.Windows.EventTracing;
@@ -30,7 +30,7 @@ namespace TID
 
         static void PrintUsage()
         {
-            Console.WriteLine($"Usage: TraceInfoDumper.exe [input ETL path] [output XML path]");
+            Console.WriteLine($"Usage: TraceInfoDumper.exe [input ETL path] [output JSON path]");
         }
 
         static bool IsPathValid(string path)
@@ -64,7 +64,7 @@ namespace TID
             if (!File.Exists(input) || !Path.GetExtension(input).Equals(".etl", StringComparison.InvariantCultureIgnoreCase))
                 FailWithMessage("Invalid input file argument");
 
-            if (!IsPathValid(output) || !Path.GetExtension(output).Equals(".xml", StringComparison.InvariantCultureIgnoreCase))
+            if (!IsPathValid(output) || !Path.GetExtension(output).Equals(".json", StringComparison.InvariantCultureIgnoreCase))
                 FailWithMessage("Invalid output file argument");
 
             TraceData traceData = null;
@@ -78,11 +78,11 @@ namespace TID
 
             try
             {
-                TraceDataXmlWriter.Write(traceData, output);
+                TraceDataJsonWriter.Write(traceData, output);
             }
             catch (Exception e)
             {
-                FailWithMessage($"Unable write result XML file: {e.Message}");
+                FailWithMessage($"Unable to write result JSON file: {e.Message}");
             }
         }
     }
