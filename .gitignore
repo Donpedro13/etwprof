@@ -18,6 +18,7 @@ out/
 
 # VS code
 launch.json
+settings.json
 
 # VS solution/projects folder
 IDE/
