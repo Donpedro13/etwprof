@@ -16,7 +16,7 @@ namespace TID
             public Process(int id, string imageName)
             {
                 Id = id;
-                ImageName = imageName;
+                ImageName = imageName == null ? "" : imageName;
             }
             public int Id { get; }
             public string ImageName { get; }

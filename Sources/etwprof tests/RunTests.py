@@ -212,6 +212,9 @@ def check_prerequisites(testbin_folder_path):
     if not os.path.exists(os.path.join(testbin_folder_path, "etwprof.exe")):
         fail("etwprof binary is missing from the binary folder!")
 
+    if not os.path.exists(os.path.join(testbin_folder_path, "traceinfodumper.exe")):
+        fail("traceinfodumper binary is missing from the binary folder!")
+
     if not has_admin_privileges():
         fail("Tests must be run with admin privileges!")
 

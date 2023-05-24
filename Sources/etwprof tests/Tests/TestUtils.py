@@ -7,6 +7,7 @@ import sys
 import TestConfig
 import test_framework
 import tempfile
+import time
 
 class Win32NamedEvent:
     def __init__(self, name, create_or_open = False):
@@ -160,7 +161,7 @@ def is_win7_or_earlier() -> bool:
 
 _XPERF_ETW_SESSIONS_RE = re.compile(r"Logger Name\s*:\s*(?P<session_name>.*)")
 
-def _get_etw_session_list():
+def _get_etw_session_list() -> list[str]:
     result = subprocess.run(["xperf", "-loggers"], capture_output = True)
     
     result_str = result.stdout.decode("ascii")  # We would need ACP, but that's not easy; hope for the best...
@@ -172,13 +173,13 @@ def _get_etw_session_list():
 
     return session_names
 
-def _is_relevant_session(name: str):
+def _is_relevant_session(name: str) -> bool:
     if is_win7_or_earlier():
         return name == "NT Kernel Logger"
     else:
         return name.lower().startswith("etwprof")
 
-def _get_all_running_etwprof_sessions():
+def _get_all_running_etwprof_sessions() -> list[str]:
     sessions = _get_etw_session_list()
     etwprof_sessions = []
     for session in sessions:
@@ -190,12 +191,33 @@ def _get_all_running_etwprof_sessions():
 def _stop_etw_session(name) -> bool:
     return subprocess.run(["xperf", "-stop", name], stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL).returncode == 0
 
-def stop_etwprof_sessions_if_any():
+def stop_etwprof_sessions_if_any() -> list[str]:
     etwprof_sessions = _get_all_running_etwprof_sessions()
     for session_name in etwprof_sessions:
         _stop_etw_session(session_name)
 
     return etwprof_sessions
+
+def are_any_etwprof_sessions() -> bool:
+    return bool(_get_all_running_etwprof_sessions())
+
+def wait_for_etwprof_session(timeout = 10):
+    """Waits for an etwprof ETW session to appear.
+       Make sure that the session cannot stop before this function returns,
+       or detection will be prone to a race condition"""
+    start_time = time.time()
+    
+    etwprof_session_found = False
+    while not etwprof_session_found:
+        if time.time() - start_time >= timeout:
+            raise RuntimeError("etwprof session did not start in given time")
+        
+        etwprof_session_found = are_any_etwprof_sessions()
+        
+        time.sleep(0.1)
+
+    return etwprof_session_found
+
 
 class ETWProfFixture:
     def setup(self):

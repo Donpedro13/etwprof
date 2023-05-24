@@ -9,17 +9,17 @@ from typing import List, Callable, Optional
 _ASSERT_EXPR_REGEX = re.compile(r"(assert_|expect_).*?\((?P<expr>.*)\).*")
 
 class TestFailure:
-    def __init__(self, msg: str):
-        self._msg = msg
+    def __init__(self, failure_str: str):
+        self._failure_str = failure_str
 
     def __str__(self):
-        return self._msg
+        return self._failure_str
 
 class TestFailureWithLocation(TestFailure):
-    def __init__(self, desc: str, expr_desc: str, nskip = 1, frame_summary_list = None):
+    def __init__(self, desc: str, msg: Optional[str], nskip = 1, frame_summary_list = None, omit_expr: bool = False):
         self._desc = desc
-        self._expr_desc = expr_desc
-        self._expr = "UNKNOWN"
+        self._msg = msg
+        self._expr = None if omit_expr else "UNKNOWN"
         self._loc = "UNKNOWN"
 
         ss = None
@@ -31,18 +31,26 @@ class TestFailureWithLocation(TestFailure):
             ss.reverse()
 
         frame_of_interest = ss[1 + nskip]
-        self._expr = frame_of_interest.line
 
         self._loc = "{module}!{function} Line {lineno}".format(module = os.path.basename(frame_of_interest.filename),
                                                                function = frame_of_interest.name,
                                                                lineno = frame_of_interest.lineno)
 
-        # A bit naive and lousy, but works for most cases...
-        match = _ASSERT_EXPR_REGEX.match(frame_of_interest.line)
-        if match:
-            self._expr = match.group("expr")
+        if not omit_expr:
+            # A bit naive and lousy, but works for most cases...
+            self._expr = frame_of_interest.line
+            match = _ASSERT_EXPR_REGEX.match(frame_of_interest.line)
+            if match:
+                self._expr = match.group("expr")
 
-        super().__init__ (f"{self.description} at {self.location}\n\t\"{self.expression}\" {self.expression_description}")
+        failure_string_trail = ""
+        if self.expression:
+            failure_string_trail = f'"{self.expression}"'
+
+        if self.message:
+            failure_string_trail += " ".join([failure_string_trail, self.message])
+
+        super().__init__ (f"{self.description} at {self.location}\n\t{failure_string_trail}")
 
     @classmethod
     def from_exception(cls, e):
@@ -57,8 +65,8 @@ class TestFailureWithLocation(TestFailure):
         return self._expr
 
     @property
-    def expression_description(self):
-        return self._expr_desc
+    def message(self):
+        return self._msg
 
     @property
     def location(self):
@@ -92,7 +100,7 @@ class TestCase:
     def suite(self, suite):
         self._suite = suite
 
-    def add_failure(self, failure: TestFailureWithLocation):
+    def add_failure(self, failure: TestFailureWithLocation|TestFailure):
         self._failures.append(failure)
 
     def has_failures(self) -> bool:
@@ -200,6 +208,11 @@ class TestRunner:
                     self._failed_cases.append(case)
                     
                     self.on_case_end(case)
+                except TestCaseFailedError as e:
+                    case.add_failure(e.failure)
+                    self._failed_cases.append(case)
+                    
+                    self.on_case_end(case)
                 except RuntimeError as e:
                     case.add_failure(TestFailureWithLocation.from_exception(e))
                     self._failed_cases.append(case)
@@ -240,9 +253,19 @@ def testcase(suite, name, fixture = None):
 
 class AssertionFailedError(RuntimeError):
     def __init__(self, desc: str):
-        self._failure = TestFailureWithLocation(ASSERT_MSG, desc, 3)
+        self._failure = TestFailureWithLocation(ASSERT_MSG, desc, nskip=3 )
 
         super().__init__(f"{ASSERT_MSG} at {self._failure.location}:\n\"{self._failure.expression}\" {desc}!")
+
+    @property
+    def failure(self):
+        return self._failure
+    
+class TestCaseFailedError(RuntimeError):
+    def __init__(self, msg: str):
+        self._failure = TestFailureWithLocation(FAIL_MSG, msg=msg, nskip=3, omit_expr=True)
+
+        super().__init__(f"{FAIL_MSG} at {self._failure.location}:\n {msg}!")
 
     @property
     def failure(self):
@@ -250,7 +273,11 @@ class AssertionFailedError(RuntimeError):
 
 # Assertions
 ASSERT_MSG = "Assertion failed"
+FAIL_MSG = "Test case failed"
 IMPL_SKIP = 2
+
+def _test_case_fail_impl(msg: str):
+    raise TestCaseFailedError(msg)
 
 def _assert_true_impl(to_test, fatal):
     if not to_test:
@@ -284,6 +311,9 @@ def _assert_nonzero_impl(to_test, fatal):
         else:
             current_case.add_failure(TestFailureWithLocation(ASSERT_MSG, DESC, nskip = IMPL_SKIP))
 
+def fail(msg: str):
+    _test_case_fail_impl(msg)
+    
 def assert_true(to_test):
     _assert_true_impl(to_test, True)
 
@@ -309,7 +339,7 @@ def assert_nonzero(to_test):
     _assert_nonzero_impl(to_test, True)
 
 def expect_true(to_test):
-    _assert_true_impll(to_test, False)
+    _assert_true_impl(to_test, False)
 
 def expect_false(to_test):
     _assert_false_impl(to_test, False)
