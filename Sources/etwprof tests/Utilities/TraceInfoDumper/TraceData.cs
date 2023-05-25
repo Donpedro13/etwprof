@@ -1,7 +1,8 @@
 ﻿using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Cpu;
+using Microsoft.Windows.EventTracing.Events;
 using Microsoft.Windows.EventTracing.Processes;
-
+using Microsoft.Windows.EventTracing.Symbols;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -81,6 +82,8 @@ namespace TID
                 IPendingResult<IThreadDataSource> pendingThreadData = trace.UseThreads();
                 IPendingResult<ICpuSampleDataSource> pendingCpuSampleData = trace.UseCpuSamplingData();
                 IPendingResult<ICpuSchedulingDataSource> pendingCpuSchedulingData = trace.UseCpuSchedulingData();
+                IPendingResult<IStackDataSource> pendingStackData = trace.UseStacks();
+                IPendingResult<IStackEventDataSource> pendingStackEventData = trace.UseStackEvents();
 
                 trace.Process();
 
@@ -88,6 +91,7 @@ namespace TID
                 GatherThreadData(pendingThreadData.Result);
                 GatherCpuSampleData(pendingCpuSampleData.Result);
                 GatherCpuSchedulingData(pendingCpuSchedulingData.Result);
+                GatherStackData(pendingStackData.Result, pendingStackEventData.Result);
             }
         }
 
@@ -177,6 +181,37 @@ namespace TID
             }
         }
 
+        private void GatherStackData(IStackDataSource stackDataSource, IStackEventDataSource stackEventDataSource)
+        {
+            foreach(IStackSnapshot stack in stackDataSource.Stacks)
+            {
+                Process process = new Process(stack.Process.Id, stack.Process.ImageName);
+                IStackEvent origEvent = stack.GetEvent(stackEventDataSource);
+
+                if (origEvent == null)
+                    continue;
+
+                int eventId = origEvent.Opcode ?? origEvent.Id; // Handle both "classic" and manifested events
+
+                if (!StackCountsByProcessAndProviderAndId.ContainsKey(process))
+                {
+                    StackCountsByProcessAndProviderAndId.Add(process, new Dictionary<Tuple<Guid, int>, int>());
+                    StackCountsByProcessAndProviderAndId[process].Add(Tuple.Create(origEvent.ProviderId, eventId), 1);
+                }
+                else
+                {
+                    var processDict = StackCountsByProcessAndProviderAndId[process];
+                    var providerOpcodeTuple = Tuple.Create(origEvent.ProviderId, eventId);
+                    if (!processDict.ContainsKey(providerOpcodeTuple)) {
+                        processDict.Add(providerOpcodeTuple, 1);
+                    } else
+                    {
+                        ++processDict[providerOpcodeTuple];
+                    }
+                }
+            }
+        }
+
         public string EtlPath { get; }
 
         public List<Process> Processes { get; } = new List<Process>();
@@ -185,5 +220,6 @@ namespace TID
         public Dictionary<Process, int> SampledProfileCountsByProcess { get; } = new Dictionary<Process, int>();
         public Dictionary<Process, int> ContextSwitchCountsByProcess { get; } = new Dictionary<Process, int>();
         public Dictionary<Process, int> ReadyThreadCountsByProcess { get; } = new Dictionary<Process, int>();
+        public Dictionary<Process, Dictionary<Tuple<Guid, int>, int>> StackCountsByProcessAndProviderAndId { get; } = new Dictionary<Process, Dictionary<Tuple<Guid, int>, int>>();
     }
 }

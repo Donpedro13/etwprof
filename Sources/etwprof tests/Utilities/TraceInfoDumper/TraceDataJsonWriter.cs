@@ -144,6 +144,43 @@ namespace TID
             writer.WriteEndArray();
         }
 
+        private static void WriteStackCounts(JsonWriter writer, TraceData traceData)
+        {
+            writer.WritePropertyName("stackCounts");
+            writer.WriteStartArray();
+
+            foreach (var item in traceData.StackCountsByProcessAndProviderAndId)
+            {
+                writer.WriteStartObject();
+
+                writer.WritePropertyName("process");
+                WriteProcess(writer, item.Key);
+
+                writer.WritePropertyName("stackCountsByProviderAndId");
+                writer.WriteStartArray();
+
+                foreach(var countByProviderAndId in item.Value)
+                {
+                    writer.WriteStartObject();
+
+                    writer.WritePropertyName("providerId");
+                    writer.WriteValue(countByProviderAndId.Key.Item1);
+                    writer.WritePropertyName("eventId");
+                    writer.WriteValue(countByProviderAndId.Key.Item2);
+                    writer.WritePropertyName("count");
+                    writer.WriteValue(countByProviderAndId.Value);
+
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
         public static void Write(TraceData data, string outputPath)
         {
             if (!Path.GetExtension(outputPath).Equals(".json", StringComparison.CurrentCultureIgnoreCase))
@@ -167,6 +204,7 @@ namespace TID
                         WriteSampledProfileCounts(writer, data);
                         WriteContextSwitchCounts(writer, data);
                         WriteReadyThreadCounts(writer, data);
+                        WriteStackCounts(writer, data);
 
                     writer.WriteEndObject();
                 writer.WriteEndObject();
