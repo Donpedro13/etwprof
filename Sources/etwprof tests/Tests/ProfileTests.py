@@ -10,6 +10,7 @@ from TestUtils import *
 from typing import *
 import time
 import json
+from uuid import UUID
 
 _profile_suite = TestSuite("Profile tests")
 
@@ -126,6 +127,7 @@ class TraceData():
     sampled_profile_counts_by_process: dict[ProcessInfo, int]
     context_switch_counts_by_process: dict[ProcessInfo, int]
     ready_thread_counts_by_process: dict[ProcessInfo, int]
+    stack_counts_by_process_providerid_eventid: dict[ProcessInfo, dict[UUID, dict[int, int]]]
 
     @classmethod
     def from_traceinfodumper_file(cls, json_path:str):
@@ -167,9 +169,22 @@ class TraceData():
             context_switch_counts_by_process[process_info] = context_switch_count["count"]
 
         ready_thread_counts_by_process: dict[ProcessInfo, int] = {}
-        for ready_thread_count in data["contextSwitchCounts"]:
+        for ready_thread_count in data["readyThreadCounts"]:
             process_info = processes_by_pid[ready_thread_count["process"]["pid"]]
             ready_thread_counts_by_process[process_info] = ready_thread_count["count"]
+
+        stack_counts_by_process_providerid_eventid: dict[ProcessInfo, dict[UUID, dict[int, int]]] = {}
+        for stack_count in data["stackCounts"]:
+            process_info = processes_by_pid[stack_count["process"]["pid"]]
+            stack_counts_by_process_providerid_eventid[process_info] = {}
+
+            for stack_count_by_provider_and_id in stack_count["stackCountsByProviderAndId"]:
+                provider_id = UUID(stack_count_by_provider_and_id["providerId"])
+                if provider_id not in stack_counts_by_process_providerid_eventid[process_info]:
+                    stack_counts_by_process_providerid_eventid[process_info][provider_id] = {}
+
+                event_id = stack_count_by_provider_and_id["eventId"]
+                stack_counts_by_process_providerid_eventid[process_info][provider_id][event_id] = stack_count_by_provider_and_id["count"]
 
         return cls(etl_path,
                    processes_by_pid,
@@ -177,7 +192,8 @@ class TraceData():
                    threads_by_process,
                    sampled_profile_counts_by_process,
                    context_switch_counts_by_process,
-                   ready_thread_counts_by_process)
+                   ready_thread_counts_by_process,
+                   stack_counts_by_process_providerid_eventid)
 
 def _perform_profile_test(operation, outdir_or_file, extra_args = None, options = ProfileTestOptions.DEFAULT) -> Tuple[List[str], List[ProcessInfo]]:
     "Performs a profiling test case with PTH, and returns a file/folder list, and ProcessInfo list as a result"
@@ -399,6 +415,68 @@ class ZeroReadyThreadCountPredicate(CountForProcessPredicateBase):
     def __init__(self, process: ProcessInfo):
         super().__init__("ready thread", "ready_thread_counts_by_process", process, ComparisonOperator.EQUAL, 0)
 
+class StackCountByProviderAndEventIdGTEPredicate(Predicate):
+    def __init__(self, process: ProcessInfo, expected_counts_at_least: dict[tuple[UUID, int], int]):
+        self._process = process
+        self._expected_counts_at_least = expected_counts_at_least
+
+    def evaluate(self, trace_data: TraceData) -> bool:
+        if self._process not in trace_data.stack_counts_by_process_providerid_eventid:
+            if all(count == 0 for count in self._expected_counts_at_least) == 0:
+                self._explanation = "Even though no stack events are associated with the given process, all given references were zero"
+
+                return True
+            else:
+                self._explanation = "No stack events are associated with the given process"
+
+                return False
+        
+        stack_counts_by_providers = trace_data.stack_counts_by_process_providerid_eventid[self._process]
+
+        # Check if we have stack events for providers and/or event ids that we do not expect
+        for provider in stack_counts_by_providers:
+            expected_providers = [provider for (provider, _) in self._expected_counts_at_least]
+            if provider not in expected_providers:
+                self._explanation = f'Unexpected stack events found for provider "{provider}"'
+
+                return False
+                
+            for event_id in stack_counts_by_providers[provider]:
+                if (provider, event_id) not in self._expected_counts_at_least:
+                    self._explanation = f'Unexpected stack events found for event id "{event_id}" of provider "{provider}"'
+
+                    return False
+
+        for (provider_id, event_id), expected_count_at_least in self._expected_counts_at_least.items():
+            if provider_id not in stack_counts_by_providers:
+                self._explanation = f'No stack events are associated with provider "{provider_id}"'
+
+                return False
+            
+            if event_id not in stack_counts_by_providers[provider_id]:
+                self._explanation = f'No stack events are associated with event id of "{event_id}" for provider "{provider_id}"'
+
+                return False
+            
+            if stack_counts_by_providers[provider_id][event_id] < expected_count_at_least:
+                self._explanation = f'''The stack event count for the provider "{provider_id}" and event id "{event_id}" was < than the given reference.
+                                     \tIn trace data: {stack_counts_by_providers[provider_id][event_id]}
+                                     \tReference: {expected_count_at_least}'''
+
+                return False
+
+        self._explanation = "The stack counts for each provider and event id were >= than the given references"
+
+        return True
+    
+# Some common provider GUIDs and event IDs
+PERF_INFO_GUID = UUID("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc")
+PERF_INFO_SAMPLED_PROFILE_ID = 46
+
+THREAD_GUID = UUID("3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c")
+THREAD_CSWITCH_ID = 36
+THREAD_READY_THREAD_ID = 50
+
 class _EtlContentExpectation():
     def __init__(self, file_pattern: str, predicates: List[Predicate]):
         self._file_pattern = file_pattern
@@ -435,7 +513,7 @@ class _EtlContentExpectation():
                 if not p.evaluate(trace_data):
                     fail(f"ETL content predicate ({type(p)}) is not satisfied: {p.explain()}")
 
-def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo], thread_count_min: int = 1, sampled_profile_min: int = 1):
+def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo], thread_count_min: int = 1, sampled_profile_min: int = 1, stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None):
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
@@ -455,6 +533,15 @@ def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo], threa
         predicates.append(ImageSubsetPredicate(p, images))
         predicates.append(ThreadCountGTEPredicate(p, thread_count_min))
         predicates.append(SampledProfileCountGTEPredicate(p, sampled_profile_min))
+
+        if not stack_count_predicate:
+            # We expect call stacks for sampled profiles
+            expected_stack_counts = {
+                (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): sampled_profile_min
+            }
+            predicates.append(StackCountByProviderAndEventIdGTEPredicate(p, expected_stack_counts))
+        else:
+            predicates.append(stack_count_predicate)
         
     return predicates
 
@@ -498,11 +585,27 @@ def test_minidump():
 @testcase(suite = _profile_suite, name = "5 sec CPU burn with context switches", fixture = ProfileTestsFixture())
 def test_5s_cpu_burn():
     filelist, processes = _perform_profile_test("BurnCPU5s", fixture.outfile, ["--cswitch"])
+    assert(len(processes) == 1)
+    process = processes[0]
+
     # With the default rate of 1kHz, ideally, we should get 5000 samples, give or take
-    etl_content_predicates = _get_basic_etl_content_predicates(processes, sampled_profile_min=4000)
+    SAMPLED_PROFILE_MIN = 4000
+    CONTEXT_SWITCH_MIN = 150
+    READY_THREAD_MIN = 5
+    # I wasn't able to figure out why, but even for xperf's traces, only about half ot the ready thread and cswitch
+    # events have associated call stack events
+    expected_stack_counts = {
+            (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): SAMPLED_PROFILE_MIN,
+            (THREAD_GUID, THREAD_READY_THREAD_ID): READY_THREAD_MIN / 3,
+            (THREAD_GUID, THREAD_CSWITCH_ID): CONTEXT_SWITCH_MIN / 3
+        }
+    stack_count_predicate=StackCountByProviderAndEventIdGTEPredicate(process, expected_stack_counts)
+    etl_content_predicates = _get_basic_etl_content_predicates([process],
+                                                               sampled_profile_min=SAMPLED_PROFILE_MIN,
+                                                               stack_count_predicate=stack_count_predicate)
     for p in processes:
-        etl_content_predicates.append(ContextSwitchCountGTEPredicate(p, 250))
-        etl_content_predicates.append(ReadyThreadCountGTEPredicate(p, 250))
+        etl_content_predicates.append(ContextSwitchCountGTEPredicate(p, CONTEXT_SWITCH_MIN))
+        etl_content_predicates.append(ReadyThreadCountGTEPredicate(p, READY_THREAD_MIN))
 
     expectations = [_ProfileTestFileExpectation("*.etl", 1, _ETL_MIN_SIZE), _EtlContentExpectation("*.etl", etl_content_predicates)]
     _evaluate_profile_test(filelist, expectations)
