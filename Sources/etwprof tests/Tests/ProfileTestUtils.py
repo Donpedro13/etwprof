@@ -504,9 +504,7 @@ class GeneralEventCountByProviderAndEventIdSubsetPredicate(Predicate):
         for (provider_id, event_id), (operator, expected_count) in self._expected_counts.items():
             if provider_id not in event_counts_by_providers:
                 if operator.has_equality() and expected_count == 0:
-                    self._explanation = f'Even though no events are associated with provider "{provider_id}", the given reference was zero'
-
-                    return True
+                    continue
                 else:
                     self._explanation = f'No events are associated with provider "{provider_id}" for the given process'
 
@@ -514,9 +512,7 @@ class GeneralEventCountByProviderAndEventIdSubsetPredicate(Predicate):
             
             if event_id not in event_counts_by_providers[provider_id]:
                 if operator.has_equality() and expected_count == 0:
-                    self._explanation = f'Even though no events are associated with event id of "{event_id}" for provider "{provider_id}", the given reference was zero'
-
-                    return True
+                    continue
                 else:
                     self._explanation = f'No events are associated with event id of "{event_id}" for provider "{provider_id}" for the given process'
 
