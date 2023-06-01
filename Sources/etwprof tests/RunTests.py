@@ -101,7 +101,7 @@ class StylishPrinter:
         else:
             print(str, end = "")
 
-def run_tests(testbin_folder_path, filter):
+def run_tests(testbin_folder_path, filter) -> bool:
     g_n_suites = 0
     g_n_cases = 0
 
@@ -189,6 +189,8 @@ def run_tests(testbin_folder_path, filter):
 
     runner.run(filter)
 
+    return not runner.has_failures()
+
 def fail(error_msg):
     StylishPrinter.print_red(f"{error_msg}\n")
     sys.exit(-1)
@@ -234,7 +236,7 @@ def main():
 
     filter = sys.argv[2] if len(sys.argv) == 3 else "*"
     
-    run_tests(testbin_folder_path, filter)
+    return 0 if run_tests(testbin_folder_path, filter) else 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
