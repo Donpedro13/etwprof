@@ -128,6 +128,7 @@ class TraceData():
     context_switch_counts_by_process: dict[ProcessInfo, int]
     ready_thread_counts_by_process: dict[ProcessInfo, int]
     stack_counts_by_process_providerid_eventid: dict[ProcessInfo, dict[UUID, dict[int, int]]]
+    event_counts_by_process_providerid_eventid: dict[ProcessInfo, dict[UUID, dict[int, int]]]
 
     @classmethod
     def from_traceinfodumper_file(cls, json_path:str):
@@ -186,6 +187,19 @@ class TraceData():
                 event_id = stack_count_by_provider_and_id["eventId"]
                 stack_counts_by_process_providerid_eventid[process_info][provider_id][event_id] = stack_count_by_provider_and_id["count"]
 
+        event_counts_by_process_providerid_eventid: dict[ProcessInfo, dict[UUID, dict[int, int]]] = {}
+        for event_count in data["generalEventCounts"]:
+            process_info = processes_by_pid[event_count["process"]["pid"]]
+            event_counts_by_process_providerid_eventid[process_info] = {}
+
+            for event_count_by_provider_and_id in event_count["generalEventCountsByProviderAndId"]:
+                provider_id = UUID(event_count_by_provider_and_id["providerId"])
+                if provider_id not in event_counts_by_process_providerid_eventid[process_info]:
+                    event_counts_by_process_providerid_eventid[process_info][provider_id] = {}
+
+                event_id = event_count_by_provider_and_id["eventId"]
+                event_counts_by_process_providerid_eventid[process_info][provider_id][event_id] = event_count_by_provider_and_id["count"]
+
         return cls(etl_path,
                    processes_by_pid,
                    images_by_process,
@@ -193,7 +207,10 @@ class TraceData():
                    sampled_profile_counts_by_process,
                    context_switch_counts_by_process,
                    ready_thread_counts_by_process,
-                   stack_counts_by_process_providerid_eventid)
+                   stack_counts_by_process_providerid_eventid,
+                   event_counts_by_process_providerid_eventid)
+    
+unknown_process = ProcessInfo("", 0)
 
 def _perform_profile_test(operation, outdir_or_file, extra_args = None, options = ProfileTestOptions.DEFAULT) -> Tuple[List[str], List[ProcessInfo]]:
     "Performs a profiling test case with PTH, and returns a file/folder list, and ProcessInfo list as a result"
@@ -311,10 +328,10 @@ class ThreadCountGTEPredicate(Predicate):
 class ComparisonOperator(Enum):
     EQUAL = auto()
     NOT_EQUAL = auto()
-    GREATER_THEN = auto()
+    GREATER_THAN = auto()
     LESS_THAN = auto()
-    GREATER_THEN_EQUAL = auto()
-    LESS_THEN_EQUAL = auto()
+    GREATER_THAN_EQUAL = auto()
+    LESS_THAN_EQUAL = auto()
 
     def perform(self, left, right):
         match self:
@@ -322,13 +339,13 @@ class ComparisonOperator(Enum):
                 return left == right
             case ComparisonOperator.NOT_EQUAL:
                 return left != right
-            case ComparisonOperator.GREATER_THEN:
+            case ComparisonOperator.GREATER_THAN:
                 return left > right
             case ComparisonOperator.LESS_THAN:
                 return left < right
-            case ComparisonOperator.GREATER_THEN_EQUAL:
+            case ComparisonOperator.GREATER_THAN_EQUAL:
                 return left >= right
-            case ComparisonOperator.LESS_THEN_EQUAL:
+            case ComparisonOperator.LESS_THAN_EQUAL:
                 return left <= right
             
     def __str__(self) -> str:
@@ -337,13 +354,13 @@ class ComparisonOperator(Enum):
                 return "="
             case ComparisonOperator.NOT_EQUAL:
                 return "!="
-            case ComparisonOperator.GREATER_THEN:
+            case ComparisonOperator.GREATER_THAN:
                 return ">"
             case ComparisonOperator.LESS_THAN:
                 return "<"
-            case ComparisonOperator.GREATER_THEN_EQUAL:
+            case ComparisonOperator.GREATER_THAN_EQUAL:
                 return ">="
-            case ComparisonOperator.LESS_THEN_EQUAL:
+            case ComparisonOperator.LESS_THAN_EQUAL:
                 return "<="
             
     def get_inverse(self) -> "ComparisonOperator":
@@ -352,30 +369,31 @@ class ComparisonOperator(Enum):
                 return ComparisonOperator.NOT_EQUAL
             case ComparisonOperator.NOT_EQUAL:
                 return ComparisonOperator.EQUAL
-            case ComparisonOperator.GREATER_THEN:
-                return ComparisonOperator.LESS_THEN_EQUAL
+            case ComparisonOperator.GREATER_THAN:
+                return ComparisonOperator.LESS_THAN_EQUAL
             case ComparisonOperator.LESS_THAN:
-                return ComparisonOperator.GREATER_THEN_EQUAL
-            case ComparisonOperator.GREATER_THEN_EQUAL:
+                return ComparisonOperator.GREATER_THAN_EQUAL
+            case ComparisonOperator.GREATER_THAN_EQUAL:
                 return ComparisonOperator.LESS_THAN
-            case ComparisonOperator.LESS_THEN_EQUAL:
-                return ComparisonOperator.GREATER_THEN
+            case ComparisonOperator.LESS_THAN_EQUAL:
+                return ComparisonOperator.GREATER_THAN
+            
+    def has_equality(self) -> bool:
+        return self == ComparisonOperator.EQUAL or self == ComparisonOperator.GREATER_THAN_EQUAL or self == ComparisonOperator.LESS_THAN_EQUAL
 
 class CountForProcessPredicateBase(Predicate):
-    def __init__(self, count_description: str, trace_data_count_container_name: str, process: ProcessInfo, operator: ComparisonOperator, expectedCountOperand: int):
+    def __init__(self, count_description: str, trace_data_count_container_name: str, process: ProcessInfo, operator: ComparisonOperator, expected_count_operand: int):
         self._count_description = count_description
         self._trace_data_count_container_name = trace_data_count_container_name
         self._process = process
 
         self._operator = operator
-        self._expectedCountOperand = expectedCountOperand
+        self._expected_count_operand = expected_count_operand
 
     def evaluate(self, trace_data: TraceData) -> bool:
         container = getattr(trace_data, self._trace_data_count_container_name)
         if self._process not in container:
-            if (self._operator == ComparisonOperator.EQUAL or
-                self._operator == ComparisonOperator.GREATER_THEN_EQUAL or
-                self._operator == ComparisonOperator.LESS_THEN_EQUAL) and self._expectedCountOperand == 0:
+            if self._operator.has_equality() and self._expected_count_operand == 0:
                     self._explanation = f"Even though no {self._count_description} count is associated with the given process, the given reference was zero"
 
                     return True
@@ -384,28 +402,28 @@ class CountForProcessPredicateBase(Predicate):
 
                 return False
     
-        if self._operator.perform(container[self._process], self._expectedCountOperand):
+        if self._operator.perform(container[self._process], self._expected_count_operand):
             self._explanation = f"The {self._count_description} count for the given process was {self._operator} to/than the given reference."
 
             return True
         else:
             self._explanation = f"""The {self._count_description} count for the given process was {self._operator.get_inverse()} to/than the given reference.
             \tIn trace data: {container[self._process]}
-            \tReference: {self._expectedCountOperand}"""
+            \tReference: {self._expected_count_operand}"""
 
             return False
         
 class SampledProfileCountGTEPredicate(CountForProcessPredicateBase):
     def __init__(self, process: ProcessInfo, expectedCountAtLeast: int):
-        super().__init__("sampled profile", "sampled_profile_counts_by_process", process, ComparisonOperator.GREATER_THEN_EQUAL, expectedCountAtLeast)
+        super().__init__("sampled profile", "sampled_profile_counts_by_process", process, ComparisonOperator.GREATER_THAN_EQUAL, expectedCountAtLeast)
         
 class ContextSwitchCountGTEPredicate(CountForProcessPredicateBase):
     def __init__(self, process: ProcessInfo, expectedCountAtLeast: int):
-        super().__init__("context switch", "context_switch_counts_by_process", process, ComparisonOperator.GREATER_THEN_EQUAL, expectedCountAtLeast)
+        super().__init__("context switch", "context_switch_counts_by_process", process, ComparisonOperator.GREATER_THAN_EQUAL, expectedCountAtLeast)
 
 class ReadyThreadCountGTEPredicate(CountForProcessPredicateBase):
     def __init__(self, process: ProcessInfo, expectedCountAtLeast: int):
-        super().__init__("ready thread", "ready_thread_counts_by_process", process, ComparisonOperator.GREATER_THEN_EQUAL, expectedCountAtLeast)
+        super().__init__("ready thread", "ready_thread_counts_by_process", process, ComparisonOperator.GREATER_THAN_EQUAL, expectedCountAtLeast)
 
 class ZeroContextSwitchCountPredicate(CountForProcessPredicateBase):
     def __init__(self, process: ProcessInfo):
@@ -469,6 +487,56 @@ class StackCountByProviderAndEventIdGTEPredicate(Predicate):
 
         return True
     
+class GeneralEventCountByProviderAndEventIdSubsetPredicate(Predicate):
+    def __init__(self, process: ProcessInfo, expected_counts: dict[tuple[UUID, int], Tuple[ComparisonOperator, int]]):
+        self._process = process
+        self._expected_counts = expected_counts
+
+    def evaluate(self, trace_data: TraceData) -> bool:
+        if self._process not in trace_data.event_counts_by_process_providerid_eventid:
+            if all(operator.has_equality() and count == 0 for (operator, count) in self._expected_counts.values()) == 0:
+                self._explanation = "Even though no events are associated with the given process, all given references were zero"
+
+                return True
+            else:
+                self._explanation = "No events are associated with the given process"
+
+                return False
+        
+        event_counts_by_providers = trace_data.event_counts_by_process_providerid_eventid[self._process]
+
+        for (provider_id, event_id), (operator, expected_count) in self._expected_counts.items():
+            if provider_id not in event_counts_by_providers:
+                if operator.has_equality() and expected_count == 0:
+                    self._explanation = f'Even though no events are associated with provider "{provider_id}", the given reference was zero'
+
+                    return True
+                else:
+                    self._explanation = f'No events are associated with provider "{provider_id}" for the given process'
+
+                    return False
+            
+            if event_id not in event_counts_by_providers[provider_id]:
+                if operator.has_equality() and expected_count == 0:
+                    self._explanation = f'Even though no events are associated with event id of "{event_id}" for provider "{provider_id}", the given reference was zero'
+
+                    return True
+                else:
+                    self._explanation = f'No events are associated with event id of "{event_id}" for provider "{provider_id}" for the given process'
+
+                    return False
+            
+            if not operator.perform(event_counts_by_providers[provider_id][event_id], expected_count):
+                self._explanation = f'''The event count for provider "{provider_id}" and event id "{event_id}" was {operator.get_inverse()} to/than the given reference.
+                                     \tIn trace data: {event_counts_by_providers[provider_id][event_id]}
+                                     \tReference: {expected_count}'''
+
+                return False
+
+        self._explanation = f"The event counts for each provider and event id were in line with the given references"
+
+        return True
+    
 # Some common provider GUIDs and event IDs
 PERF_INFO_GUID = UUID("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc")
 PERF_INFO_SAMPLED_PROFILE_ID = 46
@@ -476,6 +544,12 @@ PERF_INFO_SAMPLED_PROFILE_ID = 46
 THREAD_GUID = UUID("3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c")
 THREAD_CSWITCH_ID = 36
 THREAD_READY_THREAD_ID = 50
+
+STACK_WALK_GUID = UUID("def2fe46-7bd6-4b80-bd94-f57fe20d0ce3")
+STACK_WALK_EVENT = 32
+STACK_WALK_RUNDOWN_DEFINITION = 36
+STACK_WALK_REFERENCE_KERNEL = 37
+STACK_WALK_REFERENCE_USER = 38
 
 class _EtlContentExpectation():
     def __init__(self, file_pattern: str, predicates: List[Predicate]):
@@ -513,11 +587,16 @@ class _EtlContentExpectation():
                 if not p.evaluate(trace_data):
                     fail(f"ETL content predicate ({type(p)}) is not satisfied: {p.explain()}")
 
-def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo], thread_count_min: int = 1, sampled_profile_min: int = 1, stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None):
+def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo],
+                                      thread_count_min: int = 1,
+                                      sampled_profile_min: int = 1,
+                                      additional_predicates: Optional[List[Predicate]] = None,
+                                      stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None):
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
-    unknown_process = ProcessInfo("", 0) # "Imply" the presence of the "Unknown" process, containing driver images
+    # "Imply" the presence of the "Unknown" process, containing driver images
+    global unknown_process
     driver_images = [ImageInfo("afd.sys"), ImageInfo("beep.sys"), ImageInfo("ntfs.sys")]
     predicates.append(ImageSubsetPredicate(unknown_process, driver_images))
 
@@ -542,6 +621,9 @@ def _get_basic_etl_content_predicates(target_processes: List[ProcessInfo], threa
             predicates.append(StackCountByProviderAndEventIdGTEPredicate(p, expected_stack_counts))
         else:
             predicates.append(stack_count_predicate)
+
+    if additional_predicates:
+        predicates.extend(additional_predicates)
         
     return predicates
 
@@ -549,18 +631,25 @@ def _evaluate_profile_test(filelist: List[str], expectation_list):
     for expectation in expectation_list:
         expectation.evaluate(filelist)
 
-def _evaluate_simple_profile_test(filelist: List[str], etl_file_pattern: str, processes: List[ProcessInfo], additional_expectations: Optional[List] = None):
+def _evaluate_simple_profile_test(filelist: List[str],
+                                  etl_file_pattern: str,
+                                  processes: List[ProcessInfo],
+                                  additional_etl_content_predicates: Optional[List[Predicate]] = None,
+                                  additional_expectations: Optional[List] = None):
     """Simple helper function for evaluating profile test cases where we have the usual expectations (only .etl files
     are produced, without context switches, etc.)"""
     etl_file_expectation = _ProfileTestFileExpectation(etl_file_pattern, 1, _ETL_MIN_SIZE)
 
     # Create some basic predicates for ETL content checking
-    predicates = _get_basic_etl_content_predicates(processes)
+    etl_content_predicates = _get_basic_etl_content_predicates(processes)
     for p in processes:
-        predicates.append(ZeroContextSwitchCountPredicate(p))
-        predicates.append(ZeroReadyThreadCountPredicate(p))
+        etl_content_predicates.append(ZeroContextSwitchCountPredicate(p))
+        etl_content_predicates.append(ZeroReadyThreadCountPredicate(p))
+
+    if additional_etl_content_predicates:
+        etl_content_predicates.extend(additional_etl_content_predicates)
     
-    etl_content_expectation = _EtlContentExpectation(etl_file_pattern, predicates)
+    etl_content_expectation = _EtlContentExpectation(etl_file_pattern, etl_content_predicates)
     expectations = [etl_file_expectation, etl_content_expectation]
     if additional_expectations:
         expectations.extend(additional_expectations)
@@ -580,7 +669,7 @@ def test_output_directory():
 @testcase(suite = _profile_suite, name = "Minidump", fixture = ProfileTestsFixture())
 def test_minidump():
     filelist, processes = _perform_profile_test("DoNothing", fixture.outdir, ["-m"])
-    _evaluate_simple_profile_test(filelist, "*.etl", processes, [_ProfileTestFileExpectation("*.dmp", 1, _DMP_MIN_SIZE)])
+    _evaluate_simple_profile_test(filelist, "*.etl", processes, None, [_ProfileTestFileExpectation("*.dmp", 1, _DMP_MIN_SIZE)])
 
 @testcase(suite = _profile_suite, name = "5 sec CPU burn with context switches", fixture = ProfileTestsFixture())
 def test_5s_cpu_burn():
@@ -642,7 +731,7 @@ def test_debug_mode():
     filelist, processes =  _perform_profile_test("DoNothing", fixture.outfile, ["--debug"])
     file_expectations = [_ProfileTestFileExpectation(fixture.outfile, 1, _ETL_MIN_SIZE),
                             _ProfileTestFileExpectation("*.raw.etl", 1, _ETL_MIN_SIZE)]
-    _evaluate_simple_profile_test(filelist, fixture.outfile, processes, file_expectations)
+    _evaluate_simple_profile_test(filelist, fixture.outfile, processes, None, file_expectations)
     
 @testcase(suite = _profile_suite, name = "Profiling stopped with CTRL+C", fixture = ProfileTestsFixture())
 def test_ctrl_c_stop():
@@ -655,7 +744,7 @@ def test_ctrl_c_stop():
         # Due to CTRL+C, etwprof should finish *before* the profiled process
         etwprof.check()
 
-        # Now it's time for the PTH process finish its thing
+        # Now it's time for the PTH process to finish its thing
         e.signal()
         pth.check()
 
@@ -722,7 +811,29 @@ def test_stack_caching():
         return  # Not supported on Win 7
 
     filelist, processes = _perform_profile_test("DoNothing", fixture.outfile, ["--scache"])
-    _evaluate_simple_profile_test(filelist, fixture.outfile, processes)
+    assert(len(processes) == 1)
+    process = processes[0]
+
+    # We expect stack cache events, but not "regular" stack walk ones. Cache events are "global", so they will be
+    #   attributed to the "Unknown process". Since the profiled process is short-lived, there is no guarantee that
+    #   we will get each "type" of reference.
+    expected_cache_event_counts = {
+        (STACK_WALK_GUID, STACK_WALK_REFERENCE_USER): (ComparisonOperator.GREATER_THAN_EQUAL, 0),
+        (STACK_WALK_GUID, STACK_WALK_REFERENCE_KERNEL): (ComparisonOperator.GREATER_THAN_EQUAL, 0),
+        (STACK_WALK_GUID, STACK_WALK_RUNDOWN_DEFINITION): (ComparisonOperator.GREATER_THAN_EQUAL, 1),
+    }
+    expected_stack_walk_event_counts = {
+        (STACK_WALK_GUID, STACK_WALK_EVENT): (ComparisonOperator.EQUAL, 0),
+    }
+
+    global unknown_process
+    stack_etl_content_predicates = [
+        GeneralEventCountByProviderAndEventIdSubsetPredicate(unknown_process, expected_cache_event_counts),
+        GeneralEventCountByProviderAndEventIdSubsetPredicate(process, expected_stack_walk_event_counts)]
+    _evaluate_simple_profile_test(filelist,
+                                  fixture.outfile,
+                                  processes,
+                                  additional_etl_content_predicates=stack_etl_content_predicates)
 
 @testcase(suite = _profile_suite, name = "Multiple etwprofs at once", fixture = ProfileTestsFixture())
 def test_multiple_etwprofs_at_once():
