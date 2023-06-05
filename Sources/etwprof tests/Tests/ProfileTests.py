@@ -50,6 +50,15 @@ def test_5s_cpu_burn():
     expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
     evaluate_profile_test(filelist, expectations)
 
+@testcase(suite = _profile_suite, name = "100 threads", fixture = ProfileTestsFixture())
+def test_100_threads():
+    filelist, processes = perform_profile_test("Create100Threads", fixture.outfile)
+    # We expect at least 101 threads: 100 "background" threads, and one main thread
+    etl_content_predicates = get_basic_etl_content_predicates(processes, thread_count_min=101)
+
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
+    evaluate_profile_test(filelist, expectations)
+
 @testcase(suite = _profile_suite, name = "Target specified by name", fixture = ProfileTestsFixture())
 def test_target_name():
     filelist, processes = perform_profile_test("DoNothing", fixture.outdir, options= ProfileTestOptions.TARGET_ID_NAME)

@@ -13,6 +13,7 @@ SET(util_sources
 
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/BurnCPU5sCase.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/ETWCases.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/Create100ThreadsCase.cpp"
 		)
 
 # Manifest files are needed runtime in order to register the providers

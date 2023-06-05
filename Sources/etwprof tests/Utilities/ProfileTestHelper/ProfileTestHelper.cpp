@@ -26,9 +26,14 @@ namespace {
 
 BOOL WINAPI CtrlHandler (DWORD fdwCtrlType)
 {
+    static uint16_t count = 0;
+
     switch (fdwCtrlType) {
         case CTRL_C_EVENT:
         case CTRL_BREAK_EVENT:
+            if (++count >= 5)   // Allow for "manual" termination, if needed...
+                return FALSE;
+
             std::wcout << L"Ignoring CTRL+C/CTRL+BREAK..." << std::endl;
             return TRUE;
     }
@@ -38,7 +43,7 @@ BOOL WINAPI CtrlHandler (DWORD fdwCtrlType)
 
 void Usage ()
 {
-    std::wcerr << L"Usage: ProfileTestHelper.exe <operation name>" << std::endl;
+    std::wcerr << L"Usage: ProfileTestHelper.exe <operation name> [--nowait]" << std::endl;
 }
 
 [[noreturn]] void Fail (const std::wstring& msg)
@@ -95,23 +100,67 @@ void WaitForStartSignal ()
     CloseHandle (hEvent);
 }
 
+bool HandleArgCountCheck (int argc)
+{
+    if (argc != 2 && argc != 3) {
+        std::wcout << L"Invalid number of arguments!" << std::endl;
+        Usage();
+
+        return false;
+    } else {
+        return true;
+    }
+}
+
+bool HandleNoWaitArgCheck (wchar_t* pArg)
+{
+    if (_wcsicmp (pArg, L"--nowait") != 0) {
+        std::wcout << L"Invalid second argument!" << std::endl;
+        Usage();
+
+        return false;
+    }
+
+    return true;
+}
+
+bool GetNoWaitArgCheckValue (wchar_t* pNoWaitArg)
+{
+    return _wcsicmp(pNoWaitArg, L"--nowait") == 0;
+}
+
 } // namespace
 
 int wmain (int argc, wchar_t* argv[], wchar_t* /*envp[]*/)
 {
     // Argument handling
-    if (argc != 2) {
-        std::wcout << L"Invalid number of arguments!" << std::endl;
-        Usage ();
-
+    if (!HandleArgCountCheck (argc))
         return EXIT_FAILURE;
+
+    bool waitForStartSignal = true;
+    if (argc == 3) {
+        if (!HandleNoWaitArgCheck (argv[2])) {
+            return EXIT_FAILURE;
+        }
+
+        waitForStartSignal = !GetNoWaitArgCheckValue (argv[2]);
+    }
+
+    if (argc == 3) {
+        if (_wcsicmp(argv[2], L"--nowait") != 0) {
+            std::wcout << L"Invalid second argument!" << std::endl;
+            Usage();
+
+            return EXIT_FAILURE;
+        }
     }
 
     // For ignoring interruptions which etwprof handles
     SetConsoleCtrlHandler (CtrlHandler, TRUE);
 
-    // Wait until we are told to start our work
-    WaitForStartSignal ();
+    // Wait until we are signaled to start our work (unless we are told otherwise by a command line parameter)
+    if (waitForStartSignal)
+        WaitForStartSignal ();
 
     const PTH::Operation* operation = PTH::OperationRegistrar::Instance ().Find (argv[1]);
     if (operation != nullptr) {
