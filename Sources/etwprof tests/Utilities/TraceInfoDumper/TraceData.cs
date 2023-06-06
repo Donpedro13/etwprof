@@ -38,7 +38,11 @@ namespace TID
             //        and sometimes it's zero. That's a pity, because 0 is used for both the Idle, and Unknown processes.
 ;
             int processId = e.ProcessId ?? 0;
-            var providerAndIdTuple = Tuple.Create(e.ProviderId, e.Id);
+            // Events are ID'd by TraceEvent.Id (Id for classic, and Opcode for manifest-based events). However, for
+            //   TraceLogging events, Id is always 0. To overcome this peculiarity, we use the Opcode for TraceLogging
+            //   events, so etwprof's tests can function properly.
+            int eventId = e.IsTraceLogging ? (int)e.Opcode : e.Id;
+            var providerAndIdTuple = Tuple.Create(e.ProviderId, eventId);
 
             if (!eventStatistics.ContainsKey(processId))
             {
@@ -249,7 +253,10 @@ namespace TID
                     if (origEvent == null)
                         continue;
 
-                    if (!StackCountsByProcessAndProviderAndId.ContainsKey(process))
+                // Note: unfortunately, IStackEvent (and friends) cannot distuingish TraceLogging events. Therefore,
+                //   all TraceLogging events will have 0 as their Id...
+
+                if (!StackCountsByProcessAndProviderAndId.ContainsKey(process))
                     {
                         StackCountsByProcessAndProviderAndId.Add(process, new Dictionary<Tuple<Guid, int>, int>());
                         StackCountsByProcessAndProviderAndId[process].Add(Tuple.Create(origEvent.ProviderId, origEvent.Id), 1);

@@ -1,18 +1,7 @@
 /*
   This small utility program takes an operation or test case name as an input parameter, and emits ETW events accordingly.
   
-  These are the currently available operations: - RegETW	: Register the manifest-based test ETW provider
-                                                - UnregETW	: Unregister the manifest-based test ETW provider
-                                                - DoNothing : Perform no operation
-  
-  These are the currently available test cases: - BurnCPU5s		: Burn CPU for 5 seconds
-                                                - TLEmitA		: Emit all events from Tracelogging provider "A"
-                                                - TLEmitB		: Emit all events from Tracelogging provider "B"
-                                                - TLEmitAB		: Emit all events both from Tracelogging provider "A" and "B"
-                                                - MBEmitA		: Emit all events from manifest-based provider "A"
-                                                - MBEmitB		: Emit all events from manifest-based provider "B"
-                                                - MBEmitAB		: Emit all events both from manifest-based provider "A" and "B
-                                                - EmitAll		: Emit all events from all providers
+  See the "Operations" and "Test cases" folders for the available operations and test cases.
 */
 
 #include <windows.h>
@@ -177,5 +166,7 @@ int wmain (int argc, wchar_t* argv[], wchar_t* /*envp[]*/)
                 return true;
             }
         );
+
+        return EXIT_FAILURE;
     }
 }

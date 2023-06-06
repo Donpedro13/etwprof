@@ -625,7 +625,7 @@ bool SemaProviderInfoPart (const std::wstring& part, ApplicationArguments::UserP
     }
 
     const size_t size = elements.size ();
-    if (size > 3) { // There must be to colons at maximum
+    if (size > 3) { // There must be two colons at maximum
         LogFailedSema (L"Too many colons in user provider descriptor!");
 
         return false;

@@ -77,7 +77,7 @@ void EmitAllMBA ()
 
 void EmitAllMBB ()
 {
-    HandleRegUnregMBA ();
+    HandleRegUnregMBB ();
 
     WriteEventWithTemplate1 ([] (const WCHAR* pStr, UINT16 num, const FILETIME& fileTime, const GUID& guid) {
         EventWriteB_EventA (pStr, num, &fileTime, &guid);
@@ -104,6 +104,7 @@ void EmitAllTLA ()
     WriteEventWithTemplate1 ([] (const WCHAR* pStr, UINT16 num, const FILETIME& fileTime, const GUID& guid) {
         TraceLoggingWrite (gTLA,
                            "TLA_EventA",
+                           TraceLoggingOpcode (0),
                            TraceLoggingKeyword (0b01),
                            TraceLoggingLevel (TRACE_LEVEL_CRITICAL),
                            TraceLoggingStruct (4, "TestStructA"),
@@ -115,6 +116,7 @@ void EmitAllTLA ()
 
     TraceLoggingWrite (gTLA,
                        "TLA_EventB",
+                       TraceLoggingOpcode(1),
                        TraceLoggingKeyword (0b10),
                        TraceLoggingLevel (TRACE_LEVEL_WARNING),
                        TraceLoggingBool (TRUE));
@@ -127,6 +129,7 @@ void EmitAllTLB ()
     WriteEventWithTemplate1 ([] (const WCHAR* pStr, UINT16 num, const FILETIME& fileTime, const GUID& guid) {
         TraceLoggingWrite (gTLB,
                            "TLB_EventA",
+                           TraceLoggingOpcode(0),
                            TraceLoggingKeyword (0b10),
                            TraceLoggingLevel (TRACE_LEVEL_WARNING),
                            TraceLoggingStruct (4, "TestStructB"),
@@ -138,6 +141,7 @@ void EmitAllTLB ()
 
     TraceLoggingWrite (gTLB,
                        "TLB_EventB",
+                       TraceLoggingOpcode(1),
                        TraceLoggingKeyword (0b01),
                        TraceLoggingLevel (TRACE_LEVEL_CRITICAL),
                        TraceLoggingBool (FALSE));
@@ -177,6 +181,16 @@ static OperationRegistrator registrator5 (L"MBEmitB", [] () {
 static OperationRegistrator registrator6 (L"MBEmitAB", [] () {
     EmitAllMBA ();
     EmitAllMBB ();
+
+    return true;
+});
+
+static OperationRegistrator registrator7(L"MBTLEmitAll", []() {
+    EmitAllMBA();
+    EmitAllMBB();
+
+    EmitAllTLA();
+    EmitAllTLB();
 
     return true;
 });

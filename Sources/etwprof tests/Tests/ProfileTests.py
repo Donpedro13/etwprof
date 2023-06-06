@@ -191,9 +191,9 @@ def test_stack_caching():
         GeneralEventCountByProviderAndEventIdSubsetPredicate(unknown_process, expected_cache_event_counts),
         GeneralEventCountByProviderAndEventIdSubsetPredicate(process, expected_stack_walk_event_counts)]
     evaluate_simple_profile_test(filelist,
-                                  fixture.outfile,
-                                  processes,
-                                  additional_etl_content_predicates=stack_etl_content_predicates)
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=stack_etl_content_predicates)
 
 @testcase(suite = _profile_suite, name = "Multiple etwprofs at once", fixture = ProfileTestsFixture())
 def test_multiple_etwprofs_at_once():
@@ -224,5 +224,252 @@ def test_multiple_etwprofs_at_once():
     
             evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)
 
-# TODO
-# User providers...
+# Test cases for user providers
+# 4 providers are used for testing: two manifest-based (MB), and two TraceLogging (TL) ones. Events have various levels,
+#   keywords, etc., so the "inclusion criteria" handling of etwprof can be tested.
+# There's a table below that describes the properties of these providers and events, for convenience. The "source of
+#   truth" for MB providers is the manifest file (MB.man), for TL ones it's the code itself (ETWCases.cpp). I hope to 
+#   keep them in sync...
+
+# +----------+--------+--------+---------+--------+
+# | Provider | Opcode | Level  | Keyword | Symbol |
+# +----------+--------+--------+---------+--------+
+# |          | 0      | 16     | 0x1     | A      |
+# |          +--------+--------+---------+--------+
+# |    MBA   | 1      | 17     | 0x2     | B      |
+# |          +--------+--------+---------+--------+
+# |          | 2      | 0      | 0x2     | C      |
+# +----------+--------+--------+---------+--------+
+# |          | 0      | 16     | 0x20    | A      |
+# |          +--------+--------+---------+--------+
+# |    MBB   | 1      | 17     | 0x200   | B      |
+# |          +--------+--------+---------+--------+
+# |          | 2      | 0      | 0x220   | C      |
+# +----------+--------+--------+---------+--------+
+# |          | 0      | 1      | 0x1     | A      |
+# |    TLA   +--------+--------+---------+--------+
+# |          | 1      | 3      | 0x11    | B      |
+# +----------+--------+--------+---------+--------+
+# |          | 0      | 3      | 0x11    | A      |
+# |    TLB   +--------+--------+---------+--------+
+# |          | 1      | 1      | 0x1     | B      |
+# +----------+--------+--------+---------+--------+
+
+
+@testcase(suite = _profile_suite, name = "No user providers", fixture = ProfileTestsFixture())
+def test_no_user_providers():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile)
+
+    user_provider_etl_content_predicates = []
+    for p in processes:
+        user_provider_etl_content_predicates.append(
+            GeneralEventCountByProviderAndEventIdSubsetPredicate(p, get_empty_user_provider_event_counts()))
+        
+    evaluate_simple_profile_test(filelist,
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+    
+@testcase(suite = _profile_suite, name = "User providers, manifest-based", fixture = ProfileTestsFixture())
+def test_user_providers_mb_a():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [f"--enable={MB_A_GUID}"])
+
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_B] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_C] = (ComparisonOperator.EQUAL, 1)
+
+    user_provider_etl_content_predicates = []
+    for p in processes:
+        user_provider_etl_content_predicates.append(
+            GeneralEventCountByProviderAndEventIdSubsetPredicate(p, expected_user_provider_event_counts))
+        
+    evaluate_simple_profile_test(filelist,
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+
+@testcase(suite = _profile_suite, name = "User providers, TraceLogging", fixture = ProfileTestsFixture())
+def test_user_providers_tl_a():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [f"--enable={TL_A_GUID}"])
+
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_B] = (ComparisonOperator.EQUAL, 1)
+
+    user_provider_etl_content_predicates = []
+    for p in processes:
+        user_provider_etl_content_predicates.append(
+            GeneralEventCountByProviderAndEventIdSubsetPredicate(p, expected_user_provider_event_counts))
+        
+    evaluate_simple_profile_test(filelist,
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+    
+def _impl_test_user_providers_mb_b_tl_b(stacks: bool):
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+    
+    enable_string = "--enable="
+    if stacks:
+        enable_string += f"{TL_B_GUID}::'stack'+{MB_B_GUID}::'stack'"
+    else:
+        enable_string += f"{TL_B_GUID}+{MB_B_GUID}"
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [enable_string])
+    assert(len(processes) == 1)
+    process = processes[0]
+
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_B] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_C] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_B_GUID, TL_B_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 1)
+
+    etl_content_predicates = []
+
+    etl_content_predicates.append(
+        GeneralEventCountByProviderAndEventIdSubsetPredicate(process, expected_user_provider_event_counts))
+    
+    stack_counts_predicate = None
+    if stacks:
+        expected_stack_counts = {
+            (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 1,
+            (MB_B_GUID, MB_B_A): 1,
+            (MB_B_GUID, MB_B_B): 1,
+            (MB_B_GUID, MB_B_C): 1,
+            (TL_B_GUID, 0): 2,  # HACK: TraceInfoDumper/TraceProcessor cannot distinguish TraceLogging events in the
+                                # context of call stacks, so we have to "aggregate" all events using a dummy
+                                # value of zero...
+        }
+        stack_counts_predicate = StackCountByProviderAndEventIdGTEPredicate(process, expected_stack_counts)
+
+    etl_content_predicates.extend (get_basic_etl_content_predicates(processes, stack_count_predicate= stack_counts_predicate))
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
+    evaluate_profile_test(filelist, expectations)
+
+@testcase(suite = _profile_suite, name = "User providers, manifest-based and TraceLogging", fixture = ProfileTestsFixture())
+def test_user_providers_mb_b_tl_b():
+    _impl_test_user_providers_mb_b_tl_b(False)
+
+@testcase(suite = _profile_suite, name = "User providers, manifest-based and TraceLogging w/ stacks", fixture = ProfileTestsFixture())
+def test_user_providers_mb_b_tl_b_stacks():
+    _impl_test_user_providers_mb_b_tl_b(True)
+
+@testcase(suite = _profile_suite, name = "User providers, max. level", fixture = ProfileTestsFixture())
+def test_user_providers_all_max_level_1():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [get_enable_string_for_all_providers(max_level=1)])
+
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_C] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_C] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 1)
+
+    user_provider_etl_content_predicates = []
+    for p in processes:
+        user_provider_etl_content_predicates.append(
+            GeneralEventCountByProviderAndEventIdSubsetPredicate(p, expected_user_provider_event_counts))
+        
+    evaluate_simple_profile_test(filelist,
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+    
+def _impl_all_user_providers_case(enable_string: str, expected_user_provider_event_counts):
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [enable_string])
+
+    user_provider_etl_content_predicates = []
+    for p in processes:
+        user_provider_etl_content_predicates.append(
+            GeneralEventCountByProviderAndEventIdSubsetPredicate(p, expected_user_provider_event_counts))
+        
+    evaluate_simple_profile_test(filelist,
+                                 fixture.outfile,
+                                 processes,
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+    
+@testcase(suite = _profile_suite, name = "User providers, keyword bitmask simple", fixture = ProfileTestsFixture())
+def test_user_providers_all_kw_1():
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 1)
+
+    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x1"), expected_user_provider_event_counts)
+    
+@testcase(suite = _profile_suite, name = "User providers, keyword bitmask negated", fixture = ProfileTestsFixture())
+def test_user_providers_all_kw_not_1():
+    expected_user_provider_event_counts = get_all_1_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_A] = (ComparisonOperator.EQUAL, 0)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 0)
+    expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 0)
+
+    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="~0x1"), expected_user_provider_event_counts)
+    
+@testcase(suite = _profile_suite, name = "User providers, keyword bitmask complex", fixture = ProfileTestsFixture())
+def test_user_providers_all_kw_220():
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+        
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_B] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_B_GUID, MB_B_C] = (ComparisonOperator.EQUAL, 1)
+
+    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x220"), expected_user_provider_event_counts)
+    
+@testcase(suite = _profile_suite, name = "User providers, various providers and options", fixture = ProfileTestsFixture())
+def test_user_providers_all_kw_220():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+    
+    enable_string = f"--enable={MB_A_GUID}:~0x1:'stack'+*TLA+{TL_B_GUID}:0x11:1"
+
+    filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [enable_string])
+    assert(len(processes) == 1)
+    process = processes[0]
+
+    expected_user_provider_event_counts = get_empty_user_provider_event_counts()
+
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_B] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[MB_A_GUID, MB_A_C] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_A_GUID, TL_A_B] = (ComparisonOperator.EQUAL, 1)
+    expected_user_provider_event_counts[TL_B_GUID, TL_A_B] = (ComparisonOperator.EQUAL, 1)
+    
+    etl_content_predicates = []
+
+    etl_content_predicates.append(
+        GeneralEventCountByProviderAndEventIdSubsetPredicate(process, expected_user_provider_event_counts))
+    
+    expected_stack_counts = {
+        (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 1,
+        (MB_A_GUID, MB_A_B): 1,
+        (MB_A_GUID, MB_A_C): 1,
+    }
+    stack_counts_predicate = StackCountByProviderAndEventIdGTEPredicate(process, expected_stack_counts)
+
+    etl_content_predicates.extend (get_basic_etl_content_predicates(processes, stack_count_predicate= stack_counts_predicate))
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
+    evaluate_profile_test(filelist, expectations)

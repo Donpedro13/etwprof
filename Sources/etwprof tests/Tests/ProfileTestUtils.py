@@ -647,3 +647,65 @@ def evaluate_simple_profile_test(filelist: List[str],
         expectations.extend(additional_expectations)
     
     evaluate_profile_test(filelist, expectations)
+
+# GUIDs and opcodes for user provider testing
+MB_A_GUID = UUID("382b5c97-a095-4f52-bbb6-f3b011b33563")
+MB_A_A = 0
+MB_A_B = 1
+MB_A_C = 2
+
+MB_B_GUID = UUID("465646f1-41d0-4bd2-8173-dbf7ff6cc9e2")
+MB_B_A = 0
+MB_B_B = 1
+MB_B_C = 2
+
+TL_A_GUID = UUID("11b83188-f8a1-5301-5690-e964fd71beba")
+TL_A_A = 0
+TL_A_B = 1
+
+TL_B_GUID = UUID("7ae7cc76-bdaf-5e8a-1b73-d85398dbadd3")
+TL_B_A = 0
+TL_B_B = 1
+
+def _compose_user_provider_event_counts_impl(count:int):
+    result = {}
+    result[(MB_A_GUID, MB_A_A)] = (ComparisonOperator.EQUAL, count)
+    result[(MB_A_GUID, MB_A_B)] = (ComparisonOperator.EQUAL, count)
+    result[(MB_A_GUID, MB_A_C)] = (ComparisonOperator.EQUAL, count)
+
+    result[(MB_B_GUID, MB_B_A)] = (ComparisonOperator.EQUAL, count)
+    result[(MB_B_GUID, MB_B_B)] = (ComparisonOperator.EQUAL, count)
+    result[(MB_B_GUID, MB_B_C)] = (ComparisonOperator.EQUAL, count)
+
+    result[(TL_A_GUID, TL_A_A)] = (ComparisonOperator.EQUAL, count)
+    result[(TL_A_GUID, TL_A_B)] = (ComparisonOperator.EQUAL, count)
+
+    result[(TL_B_GUID, TL_B_A)] = (ComparisonOperator.EQUAL, count)
+    result[(TL_B_GUID, TL_B_B)] = (ComparisonOperator.EQUAL, count)
+
+    return result
+
+def get_empty_user_provider_event_counts():
+    return _compose_user_provider_event_counts_impl (0)
+
+def get_all_1_user_provider_event_counts():
+    return _compose_user_provider_event_counts_impl (1)
+
+def get_enable_string_for_all_providers(kw_bitmask_string: Optional[str] = None, max_level: Optional[int] = None) -> str:
+    result = "--enable="
+    for p in [MB_A_GUID, MB_B_GUID, TL_A_GUID, TL_B_GUID]:
+        result = "".join([result, str(p), ":"])
+
+        if kw_bitmask_string:
+            result += kw_bitmask_string
+
+        result += ":"
+
+        if max_level:
+            result += str(max_level)
+
+        result += "+"
+
+    result = result[0:-1] # Strip unnecessary '+' from the last iteration
+
+    return result
