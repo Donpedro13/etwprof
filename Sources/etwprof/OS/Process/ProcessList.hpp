@@ -18,14 +18,14 @@ public:
     };
 
     struct Process {
-        std::wstring m_name;
-        DWORD        m_PID;
+        std::wstring name;
+        DWORD        PID;
 
         Process (const std::wstring& name, DWORD PID):
-            m_name (name), m_PID (PID)
+            name (name), PID (PID)
         {}
 
-        Process (): m_name (L""), m_PID (0)
+        Process (): name (L""), PID (0)
         {}
     };
 
@@ -40,10 +40,12 @@ public:
 
     uint32_t GetCount (const std::wstring& processName) const;
 
+    std::vector<Process> GetAll (const std::wstring& processName) const;
+
 private:
     using Container = std::vector<Process>;
 
-    Container m_container;
+    Container m_processes;
 };
 
 }   // namespace ETWP

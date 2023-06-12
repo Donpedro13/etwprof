@@ -31,7 +31,7 @@ ProcessList::ProcessList ()
 
     uint16_t processCount = 0;
     do {
-        m_container.
+        m_processes.
             emplace_back (PathGetFileNameAndExtension (currentProcess.szExeFile),
                                   currentProcess.th32ProcessID);
 
@@ -46,8 +46,8 @@ ProcessList::ProcessList ()
 
 bool ProcessList::Contains (const std::wstring& processName) const
 {
-    for (const auto& p : m_container) {
-        if (_wcsicmp (processName.c_str (), p.m_name.c_str ()) == 0)
+    for (const auto& p : m_processes) {
+        if (_wcsicmp (processName.c_str (), p.name.c_str ()) == 0)
             return true;
     }
 
@@ -56,8 +56,8 @@ bool ProcessList::Contains (const std::wstring& processName) const
 
 bool ProcessList::Contains (DWORD PID) const
 {
-    for (const auto& p : m_container) {
-        if (p.m_PID == PID)
+    for (const auto& p : m_processes) {
+        if (p.PID == PID)
             return true;
     }
 
@@ -68,9 +68,9 @@ DWORD ProcessList::GetPID (const std::wstring& processName) const
 {
     ETWP_ASSERT (GetCount (processName) == 1);
 
-    for (const auto& p : m_container) {
-        if (_wcsicmp (processName.c_str (), p.m_name.c_str ()) == 0)
-            return p.m_PID;
+    for (const auto& p : m_processes) {
+        if (_wcsicmp (processName.c_str (), p.name.c_str ()) == 0)
+            return p.PID;
     }
 
     return 0;
@@ -78,9 +78,9 @@ DWORD ProcessList::GetPID (const std::wstring& processName) const
 
 bool ProcessList::GetName (DWORD PID, std::wstring* pNameOut) const
 {
-    for (const auto& p : m_container) {
-        if (p.m_PID == PID) {
-            *pNameOut = p.m_name;
+    for (const auto& p : m_processes) {
+        if (p.PID == PID) {
+            *pNameOut = p.name;
 
             return true;
         }
@@ -93,12 +93,24 @@ uint32_t ProcessList::GetCount (const std::wstring& processName) const
 {
     uint32_t count = 0;
 
-    for (const auto& p : m_container) {
-        if (_wcsicmp (processName.c_str (), p.m_name.c_str ()) == 0)
+    for (const auto& p : m_processes) {
+        if (_wcsicmp (processName.c_str (), p.name.c_str ()) == 0)
             ++count;
     }
 
     return count;
+}
+
+std::vector<ProcessList::Process> ProcessList::GetAll (const std::wstring& processName) const
+{
+    std::vector<ProcessList::Process> result;
+
+    for (const auto& p : m_processes) {
+        if (_wcsicmp (processName.c_str (), p.name.c_str ()) == 0)
+            result.push_back (p);
+    }
+
+    return result;
 }
 
 }   // namespace ETWP

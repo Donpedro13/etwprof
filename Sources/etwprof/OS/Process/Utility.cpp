@@ -11,20 +11,23 @@
 
 namespace ETWP {
 
-bool CreateProcessSynchronous (const std::wstring& processPath,
-                               const std::wstring& args,
-                               DWORD* pExitCodeOut /*= nullptr*/)
+namespace {
+
+// /analyze is unaware that we close the process handle in an OnExit object...
+#pragma warning (push)
+#pragma warning (disable: 6335)
+std::expected<ProcessRef, std::wstring> CreateProcessImplNoOutput (const std::wstring& processPath,
+                                                                   const std::wstring& args,
+                                                                   ProcessRef::Options options)
 {
     const std::wstring realArgs = processPath + L" " + args;
-    std::unique_ptr<WCHAR[]> cmdLineCopy (new WCHAR[realArgs.length () + sizeof '\0']);
+    std::unique_ptr<WCHAR[]> cmdLineCopy (new WCHAR[realArgs.length () + sizeof L'\0']);
     if (wcscpy_s (cmdLineCopy.get (),
-                  realArgs.length () + sizeof '\0',
+                  realArgs.length () + 1,
                   realArgs.c_str ()) != 0)
     {
-        return false;
+        return std::unexpected (L"Unable to construct command line!");
     }
-
-    Log (LogSeverity::Debug, L"Trying to launch process " + processPath);
 
     STARTUPINFOW startupInfo = {};
     startupInfo.cb = sizeof startupInfo;
@@ -44,9 +47,9 @@ bool CreateProcessSynchronous (const std::wstring& processPath,
                                    nullptr);
 
     if (hDevNull == INVALID_HANDLE_VALUE)
-        return false;
+        return std::unexpected (L"Unable to get handle for NUL!");;
 
-    OnExit devNullHandleCloser ([&hDevNull]() { CloseHandle (hDevNull); });
+    OnExit devNullHandleCloser ([&hDevNull] () { CloseHandle (hDevNull); });
 
     startupInfo.hStdOutput = hDevNull;
     startupInfo.hStdError = hDevNull;
@@ -54,45 +57,55 @@ bool CreateProcessSynchronous (const std::wstring& processPath,
     startupInfo.dwFlags |= STARTF_USESTDHANDLES;
 
     if (CreateProcessW (processPath.c_str (),
-                    cmdLineCopy.get (),
-                    nullptr,
-                    nullptr,
-                    TRUE,
-                    0,
-                    nullptr,
-                    nullptr,
-                    &startupInfo,
-                    &processInfo) == FALSE)
+                        cmdLineCopy.get (),
+                        nullptr,
+                        nullptr,
+                        TRUE,
+                        0,
+                        nullptr,
+                        nullptr,
+                        &startupInfo,
+                        &processInfo) == FALSE)
     {
-        Log (LogSeverity::Warning, L"Unable to launch process " + processPath);
-
-        return false;
+        return std::unexpected (L"CreateProcessW failed!");
     }
 
     CloseHandle (processInfo.hThread);
 
     OnExit processHandleCloser ([&processInfo] () { CloseHandle (processInfo.hProcess); });
 
+    return ProcessRef (processInfo.dwProcessId, options);
+}
+#pragma warning (pop)
+
+}   // namespace
+
+bool CreateProcessSynchronousNoOutput (const std::wstring& processPath,
+                                       const std::wstring& args,
+                                       DWORD* pExitCodeOut /*= nullptr*/)
+{
+    std::expected<ProcessRef, std::wstring> createResult = CreateProcessImplNoOutput (processPath,
+                                                                                      args,
+                                                                                      ProcessRef::Synchronize);
+    if (!createResult.has_value ()) {
+        Log (LogSeverity::Warning, L"Unable to launch process " + processPath + L": " + createResult.error ());
+
+        return false;
+    }
+
     // Wait for the process to finish
-    bool success = false;
-    switch (WaitForSingleObject (processInfo.hProcess, INFINITE)) {
-        case WAIT_OBJECT_0:
-            success = true;
-            break;
-        case WAIT_FAILED:
-            success = false;
-            break;
-        default:
-            success = false;
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from WaitForSingleObject in CreateProcessSynchronous!");
-    }
+    createResult->Wait ();
 
-    if (success && pExitCodeOut != nullptr) {
-        if (GetExitCodeProcess (processInfo.hProcess, pExitCodeOut) == FALSE)
-            return false;
-    }
+    *pExitCodeOut = createResult->GetExitCode ();
 
-    return success;
+    return true;
+}
+
+std::expected<ProcessRef, std::wstring> CreateProcessAsynchronousNoOutput (const std::wstring& processPath,
+                                                                           const std::wstring& args,
+                                                                           ProcessRef::Options options)
+{
+    return CreateProcessImplNoOutput (processPath, args, options);
 }
 
 bool IsProcessElevated ()
@@ -118,7 +131,7 @@ bool AddProfilePrivilegeToProcessToken ()
     if (ETWP_ERROR (OpenProcessToken (GetCurrentProcess (), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken) == FALSE))
         return false;
 
-    OnExit handleGuard ([&hToken]() { CloseHandle (hToken); });
+    OnExit handleGuard ([&hToken] () { CloseHandle (hToken); });
 
     std::unique_ptr<char[]> pMem (new char[sizeof (TOKEN_PRIVILEGES) + sizeof (LUID_AND_ATTRIBUTES)]);
     PTOKEN_PRIVILEGES privileges = reinterpret_cast<PTOKEN_PRIVILEGES> (pMem.get ());
@@ -142,7 +155,7 @@ bool IsProfilePrivilegePresentInToken (bool* pResultOut)
     if (ETWP_ERROR (OpenProcessToken (GetCurrentProcess (), TOKEN_QUERY, &hToken) == FALSE))
         return false;
 
-    OnExit handleGuard ([&hToken]() { CloseHandle (hToken); });
+    OnExit handleGuard ([&hToken] () { CloseHandle (hToken); });
 
     PRIVILEGE_SET privileges;
     privileges.PrivilegeCount = 1;

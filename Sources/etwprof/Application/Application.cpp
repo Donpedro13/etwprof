@@ -233,13 +233,13 @@ bool Application::DoProfile ()
         if (!GetTarget (&target))
             return false;
 
-        Log (LogSeverity::Info, L"Found valid target: " + target.m_name + L" (" + std::to_wstring (target.m_PID) +
+        Log (LogSeverity::Info, L"Found valid target: " + target.name + L" (" + std::to_wstring (target.PID) +
              L")");
 
         // We open a HANDLE to the target process, lest it finishes and we profile an unintended process (this way Windows
         //   will not reassign the PID of the process, if it happens to exit while we are in this function)
         // We might use this HANDLE later to write a minidump, hence PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
-        hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.m_PID);
+        hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.PID);
     }
 
     OnExit processHandleCloser ([&hTargetProcess] () {
@@ -298,7 +298,7 @@ bool Application::DoProfile ()
 
         try {
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
-                                                target.m_PID,
+                                                target.PID,
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
                                                 options));
         } catch (const IProfiler::InitException& e) {
@@ -318,7 +318,7 @@ bool Application::DoProfile ()
         Log (LogSeverity::Info, L"Minidump path is " + dumpPath);
 
         std::wstring error;
-        if (ETWP_ERROR (!CreateMinidump (dumpPath, hTargetProcess, target.m_PID, m_args.minidumpFlags, &error)))
+        if (ETWP_ERROR (!CreateMinidump (dumpPath, hTargetProcess, target.PID, m_args.minidumpFlags, &error)))
             Log (LogSeverity::Warning, L"Unable to create minidump: " + error);
     }
     
@@ -344,7 +344,7 @@ bool Application::DoProfile ()
     ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?
                                             ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
     ProgressFeedback feedback (L"Profiling",
-                               target.m_name + L" (" + std::to_wstring (target.m_PID) + L")",
+                               target.name + L" (" + std::to_wstring (target.PID) + L")",
                                feebackStyle,
                                ProgressFeedback::State::Running);
     
@@ -418,7 +418,7 @@ bool Application::DoProfile ()
                 COut () << ColorReset << L"Launching 7zr for compression..." << Endl;
 
                 DWORD status;
-                if (ETWP_ERROR (!CreateProcessSynchronous (sevenZipPath, commandLine, &status))) {
+                if (ETWP_ERROR (!CreateProcessSynchronousNoOutput (sevenZipPath, commandLine, &status))) {
                     Log (LogSeverity::Error, L"Unable to start 7z for compression!");
 
                     return false;
@@ -454,8 +454,8 @@ bool Application::GetTarget (ProcessList::Process* pTargetOut) const
         if (m_args.targetIsPID) {
             if (processList.Contains (m_args.targetPID)) {
                 Log (LogSeverity::Info, L"PID was found in the process list");
-                ETWP_VERIFY (processList.GetName (m_args.targetPID, &pTargetOut->m_name));
-                pTargetOut->m_PID = m_args.targetPID;
+                ETWP_VERIFY (processList.GetName (m_args.targetPID, &pTargetOut->name));
+                pTargetOut->PID = m_args.targetPID;
             } else {
                 Log (LogSeverity::Error, L"Given PID was not found in the running processes list!");
 
@@ -476,12 +476,12 @@ bool Application::GetTarget (ProcessList::Process* pTargetOut) const
 
                 return false;
             } else {
-                pTargetOut->m_name = m_args.targetName;
-                pTargetOut->m_PID = processList.GetPID (m_args.targetName);
+                pTargetOut->name = m_args.targetName;
+                pTargetOut->PID = processList.GetPID (m_args.targetName);
 
-                ETWP_ASSERT (pTargetOut->m_PID != 0);
+                ETWP_ASSERT (pTargetOut->PID != 0);
 
-                Log (LogSeverity::Debug, L"PID for process name is " + std::to_wstring (pTargetOut->m_PID));
+                Log (LogSeverity::Debug, L"PID for process name is " + std::to_wstring (pTargetOut->PID));
             }
         }
     } catch (const ProcessList::InitException& /*e*/) {
@@ -491,7 +491,7 @@ bool Application::GetTarget (ProcessList::Process* pTargetOut) const
     }
 
     // If we got here, we should have a valid PID
-    ETWP_ASSERT (pTargetOut->m_PID != 0);
+    ETWP_ASSERT (pTargetOut->PID != 0);
 
     return true;
 }
@@ -501,7 +501,7 @@ std::wstring Application::GenerateDefaultOutputName (const ProcessList::Process&
                                                      ApplicationArguments::CompressionMode compressionMode) const
 {
     // Format: <AppName>[PID]-<DateTime>(.etl|.7z)
-    std::wstring result = process.m_name + L"[" + std::to_wstring (process.m_PID) + L"]-";
+    std::wstring result = process.name + L"[" + std::to_wstring (process.PID) + L"]-";
 
     SYSTEMTIME time;
     GetSystemTime (&time);
@@ -514,7 +514,7 @@ std::wstring Application::GenerateDefaultOutputName (const ProcessList::Process&
                                 time.wYear,
                                 time.wMonth,
                                 time.wDay,
-                                 time.wHour,
+                                time.wHour,
                                 time.wMinute,
                                 time.wSecond) == -1))
     {

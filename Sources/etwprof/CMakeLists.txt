@@ -1,4 +1,6 @@
 SET(etwprof_sources
+		PCH.hpp
+
 		Main.cpp
 
 		${CMAKE_CURRENT_SOURCE_DIR}/Application/Compat.manifest
@@ -39,6 +41,10 @@ SET(etwprof_sources
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Minidump.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Minidump.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessRef.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessRef.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessList.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessList.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Utility.cpp
@@ -54,6 +60,8 @@ SET(etwprof_sources
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/CriticalSection.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/CriticalSection.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/Event.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/Event.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/LockableGuard.hpp
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/ProfileInterruptRate.hpp
@@ -108,7 +116,7 @@ SET(3rdparty_binaries
 ADD_EXECUTABLE(etwprof ${etwprof_sources} ${3rdparty_binaries})
 
 # PCH
-TARGET_PRECOMPILE_HEADERS(etwprof PRIVATE <windows.h> <string> <memory>)
+TARGET_PRECOMPILE_HEADERS(etwprof PRIVATE PCH.hpp)
 
 SOURCE_GROUP(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${etwprof_sources})
 

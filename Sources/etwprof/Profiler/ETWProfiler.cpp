@@ -355,7 +355,7 @@ void ETWProfiler::Profile ()
         }
 
         // Note: we unlock the lock, so the relogging process can run lock free
-        lockGuard.Release ();
+        lockGuard.Unlock ();
 
         SetState (State::Running);
 

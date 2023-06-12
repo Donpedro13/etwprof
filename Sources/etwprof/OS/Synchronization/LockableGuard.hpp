@@ -26,10 +26,16 @@ public:
             m_lockable->Unlock ();
     }
 
-    void Release ()
+    void Unlock ()
     {
         m_lockable->Unlock ();
         m_shouldUnlock = false;
+    }
+
+    void Lock ()
+    {
+        m_lockable->Lock ();
+        m_shouldUnlock = true;
     }
 
 private:

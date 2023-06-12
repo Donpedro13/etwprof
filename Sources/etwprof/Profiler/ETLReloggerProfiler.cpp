@@ -243,7 +243,7 @@ void ETLReloggerProfiler::Profile ()
         }
 
         // Note: we unlock the lock, so the relogging process can run lock free
-        lockGuard.Release ();
+        lockGuard.Unlock ();
 
         // This will call back FilterEventForProfiling
         if (ETWP_ERROR (!filteringRelogger.StartRelogging (&errorMsg))) {

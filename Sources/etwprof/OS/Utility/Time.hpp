@@ -6,6 +6,8 @@
 namespace ETWP {
 
 using TickCount = ULONGLONG;
+using Timeout = uint32_t;
+const Timeout Infinite = INFINITE;
 
 TickCount operator""_tsec(unsigned long long seconds);
 TickCount operator""_tmin(unsigned long long minutes);
