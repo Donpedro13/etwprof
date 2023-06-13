@@ -96,6 +96,7 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/OnExit.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/ResponseFile.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Result.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/StringUtils.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/StringUtils.cpp
 		)

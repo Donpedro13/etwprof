@@ -8,6 +8,7 @@
 
 #include "Utility/Asserts.hpp"
 #include "Utility/OnExit.hpp"
+#include "Utility/Result.hpp"
 
 namespace ETWP {
 
@@ -16,9 +17,9 @@ namespace {
 // /analyze is unaware that we close the process handle in an OnExit object...
 #pragma warning (push)
 #pragma warning (disable: 6335)
-std::expected<ProcessRef, std::wstring> CreateProcessImplNoOutput (const std::wstring& processPath,
-                                                                   const std::wstring& args,
-                                                                   ProcessRef::Options options)
+Result<ProcessRef> CreateProcessImplNoOutput (const std::wstring& processPath,
+                                              const std::wstring& args,
+                                              ProcessRef::Options options)
 {
     const std::wstring realArgs = processPath + L" " + args;
     std::unique_ptr<WCHAR[]> cmdLineCopy (new WCHAR[realArgs.length () + sizeof L'\0']);
@@ -26,7 +27,7 @@ std::expected<ProcessRef, std::wstring> CreateProcessImplNoOutput (const std::ws
                   realArgs.length () + 1,
                   realArgs.c_str ()) != 0)
     {
-        return std::unexpected (L"Unable to construct command line!");
+        return Error (L"Unable to construct command line!");
     }
 
     STARTUPINFOW startupInfo = {};
@@ -47,7 +48,7 @@ std::expected<ProcessRef, std::wstring> CreateProcessImplNoOutput (const std::ws
                                    nullptr);
 
     if (hDevNull == INVALID_HANDLE_VALUE)
-        return std::unexpected (L"Unable to get handle for NUL!");;
+        return Error (L"Unable to get handle for NUL!");;
 
     OnExit devNullHandleCloser ([&hDevNull] () { CloseHandle (hDevNull); });
 
@@ -67,7 +68,7 @@ std::expected<ProcessRef, std::wstring> CreateProcessImplNoOutput (const std::ws
                         &startupInfo,
                         &processInfo) == FALSE)
     {
-        return std::unexpected (L"CreateProcessW failed!");
+        return Error (L"CreateProcessW failed!");
     }
 
     CloseHandle (processInfo.hThread);
@@ -84,9 +85,9 @@ bool CreateProcessSynchronousNoOutput (const std::wstring& processPath,
                                        const std::wstring& args,
                                        DWORD* pExitCodeOut /*= nullptr*/)
 {
-    std::expected<ProcessRef, std::wstring> createResult = CreateProcessImplNoOutput (processPath,
-                                                                                      args,
-                                                                                      ProcessRef::Synchronize);
+    Result<ProcessRef> createResult = CreateProcessImplNoOutput (processPath,
+                                                                 args,
+                                                                 ProcessRef::Synchronize);
     if (!createResult.has_value ()) {
         Log (LogSeverity::Warning, L"Unable to launch process " + processPath + L": " + createResult.error ());
 
@@ -101,9 +102,9 @@ bool CreateProcessSynchronousNoOutput (const std::wstring& processPath,
     return true;
 }
 
-std::expected<ProcessRef, std::wstring> CreateProcessAsynchronousNoOutput (const std::wstring& processPath,
-                                                                           const std::wstring& args,
-                                                                           ProcessRef::Options options)
+Result<ProcessRef> CreateProcessAsynchronousNoOutput (const std::wstring& processPath,
+                                                      const std::wstring& args,
+                                                      ProcessRef::Options options)
 {
     return CreateProcessImplNoOutput (processPath, args, options);
 }
