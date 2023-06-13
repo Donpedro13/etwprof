@@ -131,7 +131,7 @@ def run_tests(testbin_folder_path, filter) -> bool:
         print(f"{g_n_cases} case(s) from {g_n_suites} suite(s) ran ({diff * 1000:.0f} ms)")
 
         n_failed = len(failed_cases)
-        n_passed = n_failed - g_n_cases
+        n_passed = g_n_cases - n_failed
         if n_passed > 0:
             StylishPrinter.print_green("[  PASSED  ] ")
             print(f"{n_passed} test(s)")

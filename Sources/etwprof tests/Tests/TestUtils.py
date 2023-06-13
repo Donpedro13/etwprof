@@ -230,4 +230,4 @@ class ETWProfFixture:
     def teardown(self):
         stopped_sessions = stop_etwprof_sessions_if_any()
         if stopped_sessions:
-            test_framework.current_case.add_failure(test_framework.TestFailure(f'Testcase leaked the following ETW session(s): {", ".join(stopped_sessions)}'))
+            test_framework.fail (f'Testcase leaked the following ETW session(s): {", ".join(stopped_sessions)}')

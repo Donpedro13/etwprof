@@ -393,7 +393,7 @@ def test_user_providers_all_max_level_1():
                                  processes,
                                  additional_etl_content_predicates=user_provider_etl_content_predicates)
     
-def _impl_all_user_providers_case(enable_string: str, expected_user_provider_event_counts):
+def _impl_every_user_providers_case(enable_string: str, expected_user_provider_event_counts):
     if is_win7_or_earlier():
         return  # Not supported on Win 7
 
@@ -417,7 +417,7 @@ def test_user_providers_all_kw_1():
     expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 1)
     expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 1)
 
-    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x1"), expected_user_provider_event_counts)
+    _impl_every_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x1"), expected_user_provider_event_counts)
     
 @testcase(suite = _profile_suite, name = "User providers, keyword bitmask negated", fixture = ProfileTestsFixture())
 def test_user_providers_all_kw_not_1():
@@ -427,7 +427,7 @@ def test_user_providers_all_kw_not_1():
     expected_user_provider_event_counts[TL_A_GUID, TL_A_A] = (ComparisonOperator.EQUAL, 0)
     expected_user_provider_event_counts[TL_B_GUID, TL_B_B] = (ComparisonOperator.EQUAL, 0)
 
-    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="~0x1"), expected_user_provider_event_counts)
+    _impl_every_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="~0x1"), expected_user_provider_event_counts)
     
 @testcase(suite = _profile_suite, name = "User providers, keyword bitmask complex", fixture = ProfileTestsFixture())
 def test_user_providers_all_kw_220():
@@ -437,7 +437,7 @@ def test_user_providers_all_kw_220():
     expected_user_provider_event_counts[MB_B_GUID, MB_B_B] = (ComparisonOperator.EQUAL, 1)
     expected_user_provider_event_counts[MB_B_GUID, MB_B_C] = (ComparisonOperator.EQUAL, 1)
 
-    _impl_all_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x220"), expected_user_provider_event_counts)
+    _impl_every_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x220"), expected_user_provider_event_counts)
     
 @testcase(suite = _profile_suite, name = "User providers, various providers and options", fixture = ProfileTestsFixture())
 def test_user_providers_all_kw_220():
