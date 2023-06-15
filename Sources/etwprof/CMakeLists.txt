@@ -118,6 +118,8 @@ ADD_EXECUTABLE(etwprof ${etwprof_sources} ${3rdparty_binaries})
 
 # PCH
 TARGET_PRECOMPILE_HEADERS(etwprof PRIVATE PCH.hpp)
+# Work around limitation (?) introduced in VS 17.6 (/std:c++latest and CMake PCHs are not friends right now...)
+SET_PROPERTY(TARGET etwprof PROPERTY VS_USER_PROPS "${CMAKE_CURRENT_SOURCE_DIR}/NoSTDModules.props")
 
 SOURCE_GROUP(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${etwprof_sources})
 
