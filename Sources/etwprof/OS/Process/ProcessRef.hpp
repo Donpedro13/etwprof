@@ -15,10 +15,11 @@ const PID InvalidPID = 0;
 // Class for wrapping an already existing, OS-native process. The process HANDLE is kept open until the object exists.
 class ProcessRef final {
 public:
-    enum Options : uint16_t {
-        Default =       0,
+    using Options = uint16_t;
+    enum : Options {
+        Default     = 0,
         Synchronize = 0b01,
-        ReadMemory =  0b10,
+        ReadMemory  = 0b10,
     };
 
     class InitException : public Exception {
@@ -39,7 +40,9 @@ public:
 
     DWORD GetExitCode () const;
 
-    PID     GetPID () const;
+    PID          GetPID () const;
+    std::wstring GetName () const;
+
     HANDLE  GetHandle () const;
     Options GetOptions () const;
 

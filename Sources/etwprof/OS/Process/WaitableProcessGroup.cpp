@@ -55,16 +55,15 @@ void WaitableProcessGroup::Add (ProcessRef&& process)
 {
     std::lock_guard guard (m_lock);
 
-    ETWP_ASSERT (process.GetOptions () & ProcessRef::Synchronize);
+    AddImpl (std::move (process));
+}
 
-    const PID pid = process.GetPID ();
-    const HANDLE handle = process.GetHandle ();
-    ETWP_ASSERT (!m_processes.contains (pid));
+void WaitableProcessGroup::Add(std::vector<ProcessRef>&& processes)
+{
+    std::lock_guard guard (m_lock);
 
-    m_processes.emplace (pid, std::move (process));
-    m_waitContexts.insert ({ &m_processes.at(pid) , { handle, nullptr, {} } });
-    
-    m_allFinishedEvent.Reset ();
+    for (auto& process : processes)
+        AddImpl (std::move (process));
 }
 
 bool WaitableProcessGroup::Delete (PID pid)
@@ -92,6 +91,13 @@ bool WaitableProcessGroup::Delete (PID pid)
         m_allFinishedEvent.Set ();
 
     return true;
+}
+
+size_t WaitableProcessGroup::GetSize () const
+{
+    std::lock_guard guard (m_lock);
+
+    return m_processes.size ();
 }
 
 bool WaitableProcessGroup::WaitForAll (Timeout timeout/* = Infinite*/)
@@ -198,6 +204,20 @@ void WaitableProcessGroup::CancelWait (ProcessWaitContext* pWaitContext, bool wa
         std::ignore = UnregisterWait (pWaitContext->hWaitHandle);
 
     pWaitContext->hWaitHandle = nullptr;
+}
+
+void WaitableProcessGroup::AddImpl (ProcessRef&& process)
+{
+    ETWP_ASSERT (process.GetOptions ()& ProcessRef::Synchronize);
+
+    const PID pid = process.GetPID ();
+    const HANDLE handle = process.GetHandle ();
+    ETWP_ASSERT (!m_processes.contains (pid));
+
+    m_processes.emplace (pid, std::move(process));
+    m_waitContexts.insert ({ &m_processes.at (pid) , { handle, nullptr, {} } });
+
+    m_allFinishedEvent.Reset ();
 }
 
 void WaitableProcessGroup::EnsureWaitingForAll ()

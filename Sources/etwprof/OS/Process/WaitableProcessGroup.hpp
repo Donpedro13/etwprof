@@ -30,10 +30,15 @@ public:
     WaitableProcessGroup (std::vector<ProcessRef>&& processes);
     WaitableProcessGroup () = default;
 
+    WaitableProcessGroup (WaitableProcessGroup&& other);    // Declared for (N)RVO, but not defined
+
     ~WaitableProcessGroup ();
 
     void Add (ProcessRef&& process);
+    void Add (std::vector<ProcessRef>&& processes);
     bool Delete (PID pid);
+
+    size_t GetSize () const;
 
     bool WaitForAll (Timeout timeout = Infinite);
     bool IsAllFinished ();
@@ -60,6 +65,7 @@ private:
     std::unordered_map<const ProcessRef*, ProcessWaitContext> m_waitContexts;
     Event                                                     m_allFinishedEvent;
 
+    void AddImpl (ProcessRef&& process); // Not synchronized
     void EnsureWaitingForAll ();    // Not synchronized
 };
 

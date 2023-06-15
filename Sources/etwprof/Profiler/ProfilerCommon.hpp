@@ -71,7 +71,7 @@ struct ProfileFilterData {
     //   only a very tiny difference, so using a hash set alone should suffice
     std::unordered_set<IETWBasedProfiler::ProviderInfo> userProviders;
     std::unordered_set<UINT_PTR> stackKeys;  // For stack cache filtering (when enabled)
-    DWORD targetPID;
+    std::unordered_set<DWORD> targetPIDs;
     bool  cswitch;
 };
 

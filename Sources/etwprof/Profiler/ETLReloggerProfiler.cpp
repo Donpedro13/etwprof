@@ -217,7 +217,7 @@ void ETLReloggerProfiler::Profile ()
     ProfileFilterData filterData = { {},
                                      {m_userProviders.begin (), m_userProviders.end () },
                                      {},
-                                     m_targetPID,
+                                     {m_targetPID},
                                      bool (m_options & RecordCSwitches) };
 
     // These will be used later, we create a copy as well (so no locking will be required)

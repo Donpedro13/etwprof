@@ -7,12 +7,13 @@
 
 #include "Arguments.hpp"
 
-#include "OS/Process/ProcessList.hpp"
+#include "OS/Process/WaitableProcessGroup.hpp"
 #include "OS/Version/WinVersion.hpp"
 
 #include "Profiler/IETWBasedProfiler.hpp"
 
 #include "Utility/Macros.hpp"
+#include "Utility/Result.hpp"
 
 namespace ETWP {
 
@@ -48,9 +49,7 @@ private:
     bool DoProfile ();
 
     // Helpers
-    bool GetTarget (ProcessList::Process* pTargetOut) const;
-    std::wstring GenerateDefaultOutputName (const ProcessList::Process& process,
-                                            ApplicationArguments::CompressionMode compressionMode) const;
+    Result<std::unique_ptr<WaitableProcessGroup>> GetTargets () const;
         
     bool HandleArguments (const Application::ArgumentVector& arguments);
 };

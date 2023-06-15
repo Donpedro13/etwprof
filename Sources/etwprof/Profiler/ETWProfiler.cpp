@@ -2,6 +2,7 @@
 
 #include <process.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "Log/Logging.hpp"
@@ -30,15 +31,14 @@
 namespace ETWP {
 
 ETWProfiler::ETWProfiler (const std::wstring& outputPath,
-                          DWORD target,
+                          WaitableProcessGroup* pTargets,
                           const ProfileRate& samplingRate,
                           IETWBasedProfiler::Flags options):
     m_lock (),
     m_resultLock (),
-    m_hTargetProcess (nullptr),
     m_hWorkerThread (nullptr),
     m_ETWSession (nullptr),
-    m_targetPID (target),
+    m_pTargets (pTargets),
     m_userProviders (),
     m_samplingRate (samplingRate),
     m_options (static_cast<Options> (options)),
@@ -46,19 +46,16 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     m_state (State::Unstarted),
     m_errorFromWorkerThread ()
 {
+    ETWP_ASSERT (pTargets != nullptr);
+
     if (!PathValid (m_outputPath))
         throw InitException (L"Output ETL path is invalid!");
 
-    if (m_targetPID == 0)
-        throw InitException (L"Target PID is invalid!");
+    if (pTargets->GetSize () == 0)
+        throw InitException (L"No targets to profile!");
 
     if (m_options & StackCache && GetWinVersion() < BaseWinVersion::Win8)
 		throw InitException (L"ETW stack caching is requested, but Windows version is less than 8!");
-
-    m_hTargetProcess = OpenProcess (SYNCHRONIZE | PROCESS_QUERY_INFORMATION, FALSE, target);
-
-    if (m_hTargetProcess == nullptr)
-        throw InitException (L"Unable to open target process (OpenProcess failed)!");
 
     // In order to be able to create a kernel logger session, we need administrative privileges
     if (!IsProcessElevated ()) {
@@ -113,7 +110,6 @@ bool ETWProfiler::Start (std::wstring* pErrorOut)
         return true;
 
     ETWP_ASSERT (pErrorOut != nullptr);
-    ETWP_ASSERT (m_hTargetProcess != nullptr);
     ETWP_ASSERT (m_ETWSession != nullptr);
 
     // Take care of profile rate
@@ -200,7 +196,7 @@ bool ETWProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut)
     }
 
     // If the profiler thread is still running, poll the target process to see if it has finished yet
-    if (HasTargetProcessExited ()) {
+    if (HaveAllTargetProcessesExited ()) {
         SetState (State::Finished);
 
         StopImpl ();    // Stop the kernel session, wait for the thread to finish
@@ -259,11 +255,15 @@ void ETWProfiler::Profile ()
 
     ETWP_DEBUG_ONLY (OnExit stateChecker ([this]() { ETWP_ASSERT (GetState () != State::Running); }));
 
+    std::unordered_set<DWORD> targetPIDs;
+    for (const auto& [pid, _] : *m_pTargets)
+        targetPIDs.insert (pid);
+
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
     ProfileFilterData filterData = { { },
                                      { m_userProviders.begin (), m_userProviders.end () },
                                      {},
-                                     m_targetPID,
+                                     std::move (targetPIDs),
                                      bool (m_options & RecordCSwitches) };
 
 	if (GetWinVersion () < BaseWinVersion::Win8 && !filterData.userProviders.empty ()) {
@@ -426,11 +426,6 @@ std::wstring ETWProfiler::GenerateETWSessionName ()
 
 void ETWProfiler::CloseHandles ()
 {
-    if (m_hTargetProcess != nullptr) {
-        CloseHandle (m_hTargetProcess);
-        m_hTargetProcess = nullptr;
-    }
-
     if (m_hWorkerThread != nullptr) {
         CloseHandle (m_hWorkerThread);
         m_hWorkerThread = nullptr;
@@ -461,26 +456,9 @@ IProfiler::State ETWProfiler::GetState ()
     return result;
 }
 
-bool ETWProfiler::HasTargetProcessExited ()
+bool ETWProfiler::HaveAllTargetProcessesExited ()
 {
-    ETWP_ASSERT (m_hTargetProcess != nullptr);
-
-    DWORD pollResult = WaitForSingleObject (m_hTargetProcess, 0);
-    switch (pollResult) {
-        case WAIT_OBJECT_0:
-            return true;
-            break;
-        case WAIT_TIMEOUT:
-            break;
-        case WAIT_FAILED:
-            ETWP_DEBUG_BREAK_STR (L"Wait failed on target process!");
-            // Hope for the best...
-            break;
-        default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from WaitForSingleObject in profiler!");
-    }
-
-    return false;
+    return m_pTargets->IsAllFinished ();
 }
 
 void ETWProfiler::WaitForProfilerThread ()

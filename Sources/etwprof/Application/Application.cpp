@@ -14,6 +14,7 @@
 
 #include "OS/FileSystem/Utility.hpp"
 #include "OS/Process/Minidump.hpp"
+#include "OS/Process/ProcessList.hpp"
 #include "OS/Process/Utility.hpp"
 #include "OS/Stream/GlobalStreams.hpp"
 #include "OS/Version/WinVersion.hpp"
@@ -47,6 +48,41 @@ bool InitCOM ()
 void UninitCOM ()
 {
     CoUninitialize ();
+}
+
+std::wstring GenerateFileNameForProcess (const std::wstring processName, PID pid, const std::wstring& extension)
+{
+    // Format: <AppName>[PID]-<DateTime>(.extension)
+    std::wstring result = processName + L"[" + std::to_wstring (pid) + L"]-";
+
+    SYSTEMTIME time;
+    GetSystemTime (&time);
+
+    constexpr size_t kMaxDateTimeLength = 256;
+    wchar_t dateTimeString[kMaxDateTimeLength];
+    if (ETWP_ERROR (swprintf_s (dateTimeString,
+                    kMaxDateTimeLength,
+                    L"%04u-%02u-%02u(%02u-%02u-%02u)",
+                    time.wYear,
+                    time.wMonth,
+                    time.wDay,
+                    time.wHour,
+                    time.wMinute,
+                    time.wSecond) == -1))
+    {
+        wcscpy_s (dateTimeString, kMaxDateTimeLength, L"UNKNOWN_DATETIME");
+    }
+
+    result += dateTimeString;
+
+    // Replace all dots with underscores for easier readability
+    std::replace (result.begin (), result.end (), L'.', L'_');
+
+    result += extension;
+
+    ETWP_ASSERT (PathValid (result));
+
+    return result;
 }
 
 }   // namespace
@@ -227,31 +263,42 @@ bool Application::DoProfile ()
                         L"Starting profiling command",
                         L"Stopping profiling command");
 
-    ProcessList::Process target;
-    HANDLE hTargetProcess = INVALID_HANDLE_VALUE;
+    std::vector<DWORD> targetPIDs;
+    // In case of emulate mode, we won't have process HANDLEs to open, obviously
+    std::unique_ptr<WaitableProcessGroup> pTargetGroup;
+
     if (!m_args.emulate) {
-        if (!GetTarget (&target))
+        Result<std::unique_ptr<WaitableProcessGroup>> targetsResult = GetTargets ();
+        if (!targetsResult.has_value()) {
+            Log (LogSeverity::Error, L"Unable to get targets for profiling: " + targetsResult.error ());
+
             return false;
+        }
 
-        Log (LogSeverity::Info, L"Found valid target: " + target.name + L" (" + std::to_wstring (target.PID) +
-             L")");
+        pTargetGroup = std::move (*targetsResult);
 
-        // We open a HANDLE to the target process, lest it finishes and we profile an unintended process (this way Windows
-        //   will not reassign the PID of the process, if it happens to exit while we are in this function)
-        // We might use this HANDLE later to write a minidump, hence PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
-        hTargetProcess = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, target.PID);
+        for (const auto& t : *pTargetGroup)
+            targetPIDs.push_back (t.first);
+
+        ETWP_ASSERT (pTargetGroup->GetSize () == targetPIDs.size ());
     }
 
-    OnExit processHandleCloser ([&hTargetProcess] () {
-        if (hTargetProcess != INVALID_HANDLE_VALUE)
-            CloseHandle (hTargetProcess);
-    });
+    ETWP_ASSERT (m_args.emulate == (pTargetGroup == nullptr));
 
     std::wstring finalOutputPath = m_args.output;
     // If the specified out path is a folder, we need to generate an appropriate file name, and append it to the output
     //   directory
-    if (!m_args.outputIsFile)
-        finalOutputPath += GenerateDefaultOutputName (target, m_args.compressionMode);
+    if (!m_args.outputIsFile) {
+        // In case of emulate mode, we won't have a process name. If we have multiple target processes, the first
+        //   process' target name and PID is used for file naming purposes
+        const std::wstring processName = pTargetGroup != nullptr ? pTargetGroup->begin ()->second.GetName () : L"";
+        const PID pid = m_args.targetIsPID ? m_args.targetPID : pTargetGroup->begin()->second.GetPID ();
+        finalOutputPath +=
+            GenerateFileNameForProcess (processName,
+                                        pid,
+                                        m_args.compressionMode ==
+                                            ApplicationArguments::CompressionMode::SevenZip ? L".7z" : L".etl");
+    }
 
     // If 7z compression is requested, we need to change the profiler output path
     std::wstring profilerOutputPath = finalOutputPath;
@@ -298,7 +345,7 @@ bool Application::DoProfile ()
 
         try {
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
-                                                target.PID,
+                                                pTargetGroup.get (),
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
                                                 options));
         } catch (const IProfiler::InitException& e) {
@@ -312,14 +359,17 @@ bool Application::DoProfile ()
     for (auto&& provInfo : m_args.userProviderInfos)
         m_pProfiler->EnableProvider ({provInfo.guid, provInfo.stack, provInfo.maxLevel, provInfo.keywordBitmask });
 
-    // Before starting profiling, write a minidump, if needed
+    // Before starting profiling, write minidumps, if needed
     if (m_args.minidump && ETWP_VERIFY (!m_args.emulate)) {
-        std::wstring dumpPath = PathReplaceExtension (finalOutputPath, L".dmp");
-        Log (LogSeverity::Info, L"Minidump path is " + dumpPath);
+        for (auto& [pid, process] : *pTargetGroup) {
+            const std::wstring dumpFileName = GenerateFileNameForProcess (process.GetName (), pid, L".dmp");
+            const std::wstring dumpPath = PathReplaceFileNameAndExtension (profilerOutputPath, dumpFileName);
+            Log (LogSeverity::Info, L"Path for minidump: " + dumpFileName);
 
-        std::wstring error;
-        if (ETWP_ERROR (!CreateMinidump (dumpPath, hTargetProcess, target.PID, m_args.minidumpFlags, &error)))
-            Log (LogSeverity::Warning, L"Unable to create minidump: " + error);
+            std::wstring error;
+            if (ETWP_ERROR (!CreateMinidump (dumpPath, process.GetHandle (), pid, m_args.minidumpFlags, &error)))
+                Log(LogSeverity::Warning, L"Unable to create minidump: " + error);
+        }
     }
     
     // Set up a console control handler for handling interruptions
@@ -342,9 +392,16 @@ bool Application::DoProfile ()
     }
 
     ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?
-                                            ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
+                                           ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
+    
+    std::wstring targetIdString;
+    if (pTargetGroup != nullptr)
+        targetIdString = pTargetGroup->begin()->second.GetName();
+    const std::wstring targetPIDOrInfo = targetPIDs.size () == 1 ?
+        std::to_wstring (*targetPIDs.begin ()) :
+        std::to_wstring (targetPIDs.size ()) + L" processes";
     ProgressFeedback feedback (L"Profiling",
-                               target.name + L" (" + std::to_wstring (target.PID) + L")",
+                               targetIdString + L" (" + targetPIDOrInfo + L")",
                                feebackStyle,
                                ProgressFeedback::State::Running);
     
@@ -446,89 +503,65 @@ bool Application::DoProfile ()
     return true;
 }
 
-bool Application::GetTarget (ProcessList::Process* pTargetOut) const
+Result<std::unique_ptr<WaitableProcessGroup>> Application::GetTargets () const
 {
+    auto result = std::make_unique<WaitableProcessGroup> ();
     try {
-        ProcessList processList;
+        const ProcessRef::Options processOptions = ProcessRef::Synchronize | ProcessRef::ReadMemory;
+        const ProcessList processList;
 
         if (m_args.targetIsPID) {
             if (processList.Contains (m_args.targetPID)) {
                 Log (LogSeverity::Info, L"PID was found in the process list");
-                ETWP_VERIFY (processList.GetName (m_args.targetPID, &pTargetOut->name));
-                pTargetOut->PID = m_args.targetPID;
-            } else {
-                Log (LogSeverity::Error, L"Given PID was not found in the running processes list!");
 
-                return false;
+                try {
+                    ProcessRef target (m_args.targetPID, processOptions);
+                    result->Add (std::move (target));
+                } catch (ProcessRef::InitException& e) {
+                        return Error (e.GetMsg ());
+                }
+            } else {
+                return Error (L"Given PID was not found in the running processes list!");
             }
         } else {
-            uint32_t count = processList.GetCount (m_args.targetName);
+            std::vector<ProcessList::Process> targets = processList.GetAll (m_args.targetName);
+            ETWP_ASSERT (std::all_of (targets.cbegin (),
+                                      targets.cend (),
+                                      [] (const ProcessList::Process p) { return p.PID != 0; }));
+
+            const size_t count = targets.size ();
+            if (count == 0)
+                return Error (L"Given process name was not found in the running processes list!");
+
             Log (LogSeverity::Info, L"Given process name was found in the running processes list " +
-                    std::to_wstring (count) +
-                    L" times");
+                 std::to_wstring (count) +
+                 L" times");
 
-            if (count == 0) {
-                Log (LogSeverity::Error, L"Given process name was not found in the running processes list!");
+            for (const auto& t : targets) {
+                try {
+                    ProcessRef target (t.PID, processOptions);
 
-                return false;
-            } else if (count > 1) {
-                Log (LogSeverity::Error, L"Given process name was found more than once in the running processes list!");
+                    Log (LogSeverity::Info, L"Target found: " + t.name + L" (" + std::to_wstring(t.PID) + L")");
 
-                return false;
-            } else {
-                pTargetOut->name = m_args.targetName;
-                pTargetOut->PID = processList.GetPID (m_args.targetName);
-
-                ETWP_ASSERT (pTargetOut->PID != 0);
-
-                Log (LogSeverity::Debug, L"PID for process name is " + std::to_wstring (pTargetOut->PID));
+                    result->Add (std::move (target));
+                } catch (ProcessRef::InitException&) {
+                    Log (LogSeverity::Warning, L"Unable to open process with PID " +
+                            std::to_wstring (t.PID) +
+                            L" (it might have exited)!");
+                }
             }
+
+            // Edge case: we had 1..n potential target processes, but could not open any of them (all of them
+            //   exited in the meantime???)
+            if (result->GetSize () == 0)
+                return Error (L"Could not open any of the target processes!");
         }
     } catch (const ProcessList::InitException& /*e*/) {
-        Log (LogSeverity::Error, L"Unable to get running processes list!");
-
-        return 0;
+        return Error (L"Unable to get running processes list!");
     }
 
-    // If we got here, we should have a valid PID
-    ETWP_ASSERT (pTargetOut->PID != 0);
-
-    return true;
-}
-
-
-std::wstring Application::GenerateDefaultOutputName (const ProcessList::Process& process,
-                                                     ApplicationArguments::CompressionMode compressionMode) const
-{
-    // Format: <AppName>[PID]-<DateTime>(.etl|.7z)
-    std::wstring result = process.name + L"[" + std::to_wstring (process.PID) + L"]-";
-
-    SYSTEMTIME time;
-    GetSystemTime (&time);
-
-    constexpr size_t kMaxDateTimeLength = 256;
-    wchar_t dateTimeString[kMaxDateTimeLength];
-    if (ETWP_ERROR (swprintf_s (dateTimeString,
-                                kMaxDateTimeLength,
-                                L"%04u-%02u-%02u(%02u-%02u-%02u)",
-                                time.wYear,
-                                time.wMonth,
-                                time.wDay,
-                                time.wHour,
-                                time.wMinute,
-                                time.wSecond) == -1))
-    {
-        wcscpy_s (dateTimeString, kMaxDateTimeLength, L"UNKNOWN_DATETIME");
-    }
-
-    result += dateTimeString;
-
-    // Replace all dots with underscores for easier readability
-    std::replace (result.begin (), result.end (), L'.', L'_');
-
-    result += compressionMode == ApplicationArguments::CompressionMode::SevenZip ? L".7z" : L".etl";
-
-    ETWP_ASSERT (PathValid (result));
+    // If we got here, we should have at least one valid target
+    ETWP_ASSERT (result->GetSize () >= 1);
 
     return result;
 }

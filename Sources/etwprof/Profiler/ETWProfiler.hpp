@@ -10,6 +10,7 @@
 #include "IETWBasedProfiler.hpp"
 
 #include "OS/ETW/ETWSessionInterfaces.hpp"
+#include "OS/Process/WaitableProcessGroup.hpp"
 #include "OS/Synchronization/CriticalSection.hpp"
 #include "OS/Utility/ProfileInterruptRate.hpp"
 
@@ -32,7 +33,7 @@ public:
     //   Error          ->  Profiling stopped because of an error
 
     ETWProfiler (const std::wstring& outputPath,
-                 DWORD target,
+                 WaitableProcessGroup* pTargets,
                  const ProfileRate& samplingRate,
                  IETWBasedProfiler::Flags options);
     virtual ~ETWProfiler () override;
@@ -56,13 +57,11 @@ private:
     // Make sure to acquire these in order, if you need both
     CriticalSection m_lock;         // Lock guarding everything, except m_result and m_errorFromWorkerThread
     CriticalSection m_resultLock;   // Lock guarding m_result and m_errorFromWorkerThread
-
-    HANDLE m_hTargetProcess;
     HANDLE m_hWorkerThread;
 
     std::unique_ptr<IKernelETWSession> m_ETWSession;
 
-    DWORD                      m_targetPID;
+    WaitableProcessGroup*      m_pTargets;
     ProviderInfos              m_userProviders;
 
     ProfileRate                m_samplingRate;
@@ -86,8 +85,8 @@ private:
     void  SetState (State newState);
     State GetState ();
 
-    bool HasTargetProcessExited (); // Not thread safe
-    void WaitForProfilerThread ();  // Not thread safe
+    bool HaveAllTargetProcessesExited (); // Not thread safe
+    void WaitForProfilerThread ();       // Not thread safe
 };
 
 }   // namespace ETWP

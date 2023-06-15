@@ -28,7 +28,7 @@ bool FilterStackWalkEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* p
             const ETWConstants::StackWalkDataStub* pData =
                 reinterpret_cast<const ETWConstants::StackWalkDataStub*> (pUserData);
 
-            return pData->m_processID == pFilterData->targetPID;
+            return pFilterData->targetPIDs.contains (pData->m_processID);
         }
 
         case ETWConstants::StackKeyKernelOpcode:
@@ -36,7 +36,7 @@ bool FilterStackWalkEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* p
             const ETWConstants::StackKeyReference* pData =
                 reinterpret_cast<const ETWConstants::StackKeyReference*> (pUserData);
 
-            if (pData->m_processID == pFilterData->targetPID) {
+            if (pFilterData->targetPIDs.contains(pData->m_processID)) {
                 pFilterData->stackKeys.insert (pData->m_key);
 
                 return true;
@@ -67,7 +67,7 @@ bool FilterThreadEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUse
 {
     const ETWConstants::ThreadDataStub* pData = reinterpret_cast<const ETWConstants::ThreadDataStub*> (pUserData);
 
-    if (pData->m_processID == pFilterData->targetPID) {
+    if (pFilterData->targetPIDs.contains (pData->m_processID)) {
         switch (opcode) {
             case ETWConstants::TStartOpcode:
                 // Thread start events shouldn't be too frequent, so this is a good opportunity to perform cleanup on
@@ -125,12 +125,16 @@ bool FilterContextSwitchEvent (UCHAR opcode, ProfileFilterData* pFilterData, voi
     }
 }
 
-bool FilterProcessEvent (ProfileFilterData* pFilterData, void* pUserData)
+bool FilterProcessEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUserData)
 {
     const ETWConstants::ProcessDataStub* pData =
         reinterpret_cast<const ETWConstants::ProcessDataStub*> (pUserData);
 
-    return pData->m_processID == pFilterData->targetPID;
+    const bool profiledProcess = pFilterData->targetPIDs.contains (pData->m_processID);
+    if (profiledProcess && opcode == ETWConstants::PEndOpcode)
+        pFilterData->targetPIDs.erase (pData->m_processID);
+
+    return profiledProcess;
 }
 
 bool FilterSampledProfileEvent (ProfileFilterData* pFilterData, void* pUserData)
@@ -146,7 +150,7 @@ bool FilterImageLoadEvent (ProfileFilterData* pFilterData, void* pUserData)
     const ETWConstants::ImageLoadDataStub* pData =
         reinterpret_cast<const ETWConstants::ImageLoadDataStub*> (pUserData);
 
-    return pData->m_processID == pFilterData->targetPID ||
+    return pFilterData->targetPIDs.contains (pData->m_processID) ||
            IsKernelModeAddress (pData->m_imageBase);    // Kernel mode parts of stacks can be interesting, so preserve
                                                         //   kernel module loads (drivers, etc.)
 }
@@ -180,7 +184,7 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
 
         return;
     }
-
+    
     EVENT_HEADER* pHeader = &pEventRecord->EventHeader;
     if (pHeader->ProviderId == StackWalkGuid) {
         if (FilterStackWalkEvent (pHeader->EventDescriptor.Opcode, pFilterData, pEventRecord->UserData)) {
@@ -226,7 +230,7 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
             }
         }
     } else if (pHeader->ProviderId == ProcessGuid) {
-        if (FilterProcessEvent (pFilterData, pEventRecord->UserData)) {
+        if (FilterProcessEvent (pHeader->EventDescriptor.Opcode, pFilterData, pEventRecord->UserData)) {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))
                 Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);
@@ -247,7 +251,7 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
             Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);
 
         return;
-    } else if (pHeader->ProcessId == pFilterData->targetPID) {
+    } else if (pFilterData->targetPIDs.contains (pHeader->ProcessId)) {
         if (FilterUserProviderEvent (pFilterData, pEventRecord->EventHeader.ProviderId)) {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))

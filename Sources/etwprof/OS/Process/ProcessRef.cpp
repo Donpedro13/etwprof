@@ -12,10 +12,10 @@ namespace {
 int ProcessOptionsToWin32Flags (ProcessRef::Options options)
 {
     int result = PROCESS_QUERY_INFORMATION; // Implied
-    if (options & ProcessRef::Options::Synchronize)
+    if (options & ProcessRef::Synchronize)
         result |= SYNCHRONIZE;
 
-    if (options & ProcessRef::Options::ReadMemory)
+    if (options & ProcessRef::ReadMemory)
         result |= PROCESS_VM_READ;
 
     return result;
@@ -102,6 +102,11 @@ DWORD ProcessRef::GetExitCode () const
 PID ProcessRef::GetPID () const
 {
     return m_pid;
+}
+
+std::wstring ProcessRef::GetName () const
+{
+    return m_imageName;
 }
 
 HANDLE ProcessRef::GetHandle () const
