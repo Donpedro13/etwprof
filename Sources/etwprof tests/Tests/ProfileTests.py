@@ -271,7 +271,8 @@ def test_no_user_providers():
     evaluate_simple_profile_test(filelist,
                                  fixture.outfile,
                                  processes,
-                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates,
+                                 sampled_profile_min=0)
     
 @testcase(suite = _profile_suite, name = "User providers, manifest-based", fixture = ProfileTestsFixture())
 def test_user_providers_mb_a():
@@ -294,7 +295,8 @@ def test_user_providers_mb_a():
     evaluate_simple_profile_test(filelist,
                                  fixture.outfile,
                                  processes,
-                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates,
+                                 sampled_profile_min=0)
 
 @testcase(suite = _profile_suite, name = "User providers, TraceLogging", fixture = ProfileTestsFixture())
 def test_user_providers_tl_a():
@@ -316,7 +318,8 @@ def test_user_providers_tl_a():
     evaluate_simple_profile_test(filelist,
                                  fixture.outfile,
                                  processes,
-                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates,
+                                 sampled_profile_min=0)
     
 def _impl_test_user_providers_mb_b_tl_b(stacks: bool):
     if is_win7_or_earlier():
@@ -347,7 +350,7 @@ def _impl_test_user_providers_mb_b_tl_b(stacks: bool):
     stack_counts_predicate = None
     if stacks:
         expected_stack_counts = {
-            (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 1,
+            (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 0,
             (MB_B_GUID, MB_B_A): 1,
             (MB_B_GUID, MB_B_B): 1,
             (MB_B_GUID, MB_B_C): 1,
@@ -357,7 +360,7 @@ def _impl_test_user_providers_mb_b_tl_b(stacks: bool):
         }
         stack_counts_predicate = StackCountByProviderAndEventIdGTEPredicate(process, expected_stack_counts)
 
-    etl_content_predicates.extend (get_basic_etl_content_predicates(processes, stack_count_predicate= stack_counts_predicate))
+    etl_content_predicates.extend (get_basic_etl_content_predicates(processes, stack_count_predicate= stack_counts_predicate, sampled_profile_min=0))
     expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
     evaluate_profile_test(filelist, expectations)
 
@@ -391,7 +394,8 @@ def test_user_providers_all_max_level_1():
     evaluate_simple_profile_test(filelist,
                                  fixture.outfile,
                                  processes,
-                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates,
+                                 sampled_profile_min=0)
     
 def _impl_every_user_providers_case(enable_string: str, expected_user_provider_event_counts):
     if is_win7_or_earlier():
@@ -407,7 +411,8 @@ def _impl_every_user_providers_case(enable_string: str, expected_user_provider_e
     evaluate_simple_profile_test(filelist,
                                  fixture.outfile,
                                  processes,
-                                 additional_etl_content_predicates=user_provider_etl_content_predicates)
+                                 additional_etl_content_predicates=user_provider_etl_content_predicates,
+                                 sampled_profile_min=0)
     
 @testcase(suite = _profile_suite, name = "User providers, keyword bitmask simple", fixture = ProfileTestsFixture())
 def test_user_providers_all_kw_1():
@@ -464,12 +469,14 @@ def test_user_providers_all_kw_220():
         GeneralEventCountByProviderAndEventIdSubsetPredicate(process, expected_user_provider_event_counts))
     
     expected_stack_counts = {
-        (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 1,
+        (PERF_INFO_GUID, PERF_INFO_SAMPLED_PROFILE_ID): 0,
         (MB_A_GUID, MB_A_B): 1,
         (MB_A_GUID, MB_A_C): 1,
     }
     stack_counts_predicate = StackCountByProviderAndEventIdGTEPredicate(process, expected_stack_counts)
 
-    etl_content_predicates.extend (get_basic_etl_content_predicates(processes, stack_count_predicate= stack_counts_predicate))
+    etl_content_predicates.extend (get_basic_etl_content_predicates(processes,
+                                                                    stack_count_predicate= stack_counts_predicate,
+                                                                    sampled_profile_min=0))
     expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
     evaluate_profile_test(filelist, expectations)

@@ -462,6 +462,12 @@ class StackCountByProviderAndEventIdGTEPredicate(Predicate):
                     return False
 
         for (provider_id, event_id), expected_count_at_least in self._expected_counts_at_least.items():
+            if provider_id not in stack_counts_by_providers and expected_count_at_least == 0:
+                continue
+
+            if event_id not in stack_counts_by_providers[provider_id] and expected_count_at_least == 0:
+                continue
+
             if provider_id not in stack_counts_by_providers:
                 self._explanation = f'No stack events are associated with provider "{provider_id}"'
 
@@ -624,16 +630,17 @@ def evaluate_profile_test(filelist: List[str], expectation_list):
         expectation.evaluate(filelist)
 
 def evaluate_simple_profile_test(filelist: List[str],
-                                  etl_file_pattern: str,
-                                  processes: List[ProcessInfo],
-                                  additional_etl_content_predicates: Optional[List[Predicate]] = None,
-                                  additional_expectations: Optional[List] = None):
+                                 etl_file_pattern: str,
+                                 processes: List[ProcessInfo],
+                                 additional_etl_content_predicates: Optional[List[Predicate]] = None,
+                                 additional_expectations: Optional[List] = None,
+                                 sampled_profile_min: int = 1):
     """Simple helper function for evaluating profile test cases where we have the usual expectations (only .etl files
     are produced, without context switches, etc.)"""
     etl_file_expectation = ProfileTestFileExpectation(etl_file_pattern, 1, ETL_MIN_SIZE)
 
     # Create some basic predicates for ETL content checking
-    etl_content_predicates = get_basic_etl_content_predicates(processes)
+    etl_content_predicates = get_basic_etl_content_predicates(processes, sampled_profile_min=sampled_profile_min)
     for p in processes:
         etl_content_predicates.append(ZeroContextSwitchCountPredicate(p))
         etl_content_predicates.append(ZeroReadyThreadCountPredicate(p))

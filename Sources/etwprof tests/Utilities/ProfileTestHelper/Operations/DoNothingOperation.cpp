@@ -8,7 +8,7 @@ static OperationRegistrator registrator (L"DoNothing", []() {
 	//   flaky, as sometimes the process finishes so quickly, that the default 1 kHz sample rate does not "capture"
 	//   any sampled profile events (especially in release builds)
 	volatile unsigned int i = 0;
-	while (i != 1'000'000)
+	while (i != 10'000'000)
 		++i;
 
 	return true;
