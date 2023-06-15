@@ -11,12 +11,12 @@ This profiler has the following design goals:
 * Processor architecture and model independent
 * It must be viable to be used as a technical support tool
 
-Unlike Microsoft provided ETW-based performance profilers (such as [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)), [Windows Performance Recorder](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder), etc.), etwprof performs filtering, so sampled profile data relevant only to the target process is saved. This results in much smaller `.etl` output files compared to other ETW-based tools.
+Unlike Microsoft provided ETW-based performance profilers (such as [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)), [Windows Performance Recorder](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder), etc.), etwprof performs filtering, so sampled profile data relevant only to the target processes are saved. This results in much smaller `.etl` output files compared to other ETW-based tools.
 
 Usage
 ----------
 
-etwprof is a command line tool. To profile an (already running) process, launch etwprof as an Administrator, and pass either the PID or the name of the executable that you'd like to profile. The following example will profile `notepad.exe`, write the resulting `.etl` file to the user's home folder, and will also create one minidump at the beginning:
+etwprof is a command line tool. To profile (already running) processes, launch etwprof as an Administrator, and pass either the PID or the name of the executable that you'd like to profile. The following example will profile `notepad.exe`, write the resulting `.etl` file to the user's home folder, and will also create one minidump at the beginning:
 
 `etwprof profile -t=notepad.exe --outdir=%USERPROFILE% -m`
 
@@ -24,9 +24,9 @@ While profiling is in progress, you should see a colorful, spinning progress ind
 
 ![Profile feedback](Documentation/profile_feedback.png "Profile feedback")
 
-Profiling stops either when you stop it explicitly by pressing `CTRL+C`, or when the target process exits.
+Profiling stops either when you stop it explicitly by pressing `CTRL+C`, or when the target processes exit.
 
-The resulting `.etl` file can be opened with a tool of your choice, such as [Windows Performance Analyzer](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer). If you open the trace with WPA, there's a small quirk: CPU usage not belonging to the target process will show up attributed to "Unknown (0)". This can be worked around easily with filtering:
+The resulting `.etl` file can be opened with a tool of your choice, such as [Windows Performance Analyzer](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer). If you open the trace with WPA, there's a small quirk: CPU usage not belonging to the target processes will show up attributed to "Unknown (0)". This can be worked around easily with filtering:
 
 ![WPA](Documentation/wpa.png "WPA")
 

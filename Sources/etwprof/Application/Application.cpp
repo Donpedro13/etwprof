@@ -215,7 +215,7 @@ void Application::PrintUsage () const
     -t --target=<t>  Target (PID or exe name)
     -o --output=<o>  Output file path
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
-    -m --mdump       Write a minidump of the target process at the start of profiling
+    -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
@@ -496,7 +496,7 @@ bool Application::DoProfile ()
     }
 
     if (state == IProfiler::State::Finished)
-        Log (LogSeverity::Info, L"Profiling finished because the target process exited!");
+        Log (LogSeverity::Info, L"Profiling finished because the target process(es) exited!");
     else
         Log (LogSeverity::Info, L"Profiling finished because it was stopped manually!");
     

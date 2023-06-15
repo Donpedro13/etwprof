@@ -8,7 +8,7 @@ __Q:__ __Fine. We already have plenty of profilers for Windows, why create a new
 __A:__ Because there weren't any existing ones with the design goals mentioned on the [Readme page](../README.md).
 
 __Q:__ __This profiler is based on ETW, but so are Windows Performance Recorder and xperf. How is this different from those tools?__  
-__A:__ The key feature of etwprof is filtering: the result `.etl` file contains data only for the target process. Thus, the `.etl` file will be substantially smaller than a regular one. This makes processing and analyzing traces much more convenient.
+__A:__ The key feature of etwprof is filtering: the result `.etl` file contains data only for the target processes. Thus, the `.etl` file will be substantially smaller than a regular one. This makes processing and analyzing traces much more convenient.
 
 __Q:__ __I need systemwide tracing. Can etwprof do that?__  
 __A:__ No. Use [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder) or [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)).
@@ -29,4 +29,4 @@ There are several ways to work around this:
 * Decrease the frequency of events (e.g. decrease the sampling rate)
 * Stop IO-intensive programs
 * Use a faster drive for the result `.etl` file
-* Use a different drive that of your target process is using
+* Use a different drive that of your target processes are using

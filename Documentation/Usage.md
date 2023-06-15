@@ -17,7 +17,7 @@ etwprof
     -t --target=<t>  Target (PID or exe name)
     -o --output=<o>  Output file path
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
-    -m --mdump       Write a minidump of the target process at the start of profiling
+    -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
@@ -34,7 +34,7 @@ Command line reference
 
 The following parameters might need further explanation:
 * `-t --target`  
-If you specify the executable's name (instead of the process ID), etwprof will fail if there are more than one instances of the target process running.
+If you specify the executable's name (instead of the process ID), and there are more than one processes running with that name, etwprof will profile all of them.
 * `-d --debug`  
 Provides even more verbose output than `-v --verbose`. Intermediate results are retained (e.g. the unmerged `.etl` output).
 * `--mflags`  
@@ -48,7 +48,7 @@ The profiler rate is **global**, and persistent until reboot.
 * `--compress`  
 Using the built-in compression (`etw`, the default) is convenient, as there is no manual decompression needed. Using 7-Zip (`7z`) results in smaller result files, but requires decompression before trace analysis.
 * `--enable`  
-Collects events from the specified user providers (filtered to the target process). The syntax is very similar to xperf's [`-on`](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/start) switch. You can specify one or more providers by name, GUID, or prefixing the provider name with an astersik. The latter will infer the GUID using the [standard algorithm](https://blogs.msdn.microsoft.com/dcook/2015/09/08/etw-provider-names-and-guids/). You can filter events by keyword and level, and also request stack traces to be collected. It's best to have a look at some examples below.
+Collects events from the specified user providers (filtered to the target processes). The syntax is very similar to xperf's [`-on`](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/start) switch. You can specify one or more providers by name, GUID, or prefixing the provider name with an astersik. The latter will infer the GUID using the [standard algorithm](https://blogs.msdn.microsoft.com/dcook/2015/09/08/etw-provider-names-and-guids/). You can filter events by keyword and level, and also request stack traces to be collected. It's best to have a look at some examples below.
 * `--scache`  
 Turns on ETW's stack caching feature. Using this option might reduce the result `.etl` file's size given enough duplicated call stacks. Use this if the profiled program has lots of hot spots and/or traced events with call stacks (e.g. user providers) are emitted from a limited variety of locations. Consumes up to 40 MBs of non-paged pool while profiling.
 * `--cswitch`  

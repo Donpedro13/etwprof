@@ -195,7 +195,7 @@ bool ETWProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut)
         return true;
     }
 
-    // If the profiler thread is still running, poll the target process to see if it has finished yet
+    // If the profiler thread is still running, poll the target process(es) to see if they have finished yet
     if (HaveAllTargetProcessesExited ()) {
         SetState (State::Finished);
 
@@ -384,7 +384,7 @@ void ETWProfiler::Profile ()
         rawETLDeleter.Deactivate ();
 
 	// The kernel session stopped, possible causes:
-	// a.) the target process exited (detected by IsFinished)
+	// a.) the target process(es) exited (detected by IsFinished)
 	// b.) profiling was stopped manually (Stop or Abort was called)
     // c.) the kernel session was stopped externally (outside of etwprof)
     
