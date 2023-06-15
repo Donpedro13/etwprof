@@ -64,12 +64,108 @@ def test_target_name():
     filelist, processes = perform_profile_test("DoNothing", fixture.outdir, options= ProfileTestOptions.TARGET_ID_NAME)
     evaluate_simple_profile_test(filelist, "*.etl", processes)
 
-@testcase(suite = _profile_suite, name = "Multiple target processes with same name", fixture = ProfileTestsFixture())
-def test_multiple_target_processes_same_name():
-    with PTHProcess(), PTHProcess(), EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+@testcase(suite = _profile_suite, name = "Multiple target processes (few) w/ dumps", fixture = ProfileTestsFixture())
+def test_multiple_target_processes_few_w_dumps():
+    N_PROCESSES = 5
+    pths = launch_pth_processes(N_PROCESSES)
+
+    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile, ["-m"]) as etwprof:
+        wait_for_etwprof_session()
+
+        for event in pths.values():
+            event.signal()
+
         etwprof.wait()
 
-        assert_neq(etwprof.exitcode, 0)
+        for p in pths:
+            p.check()
+
+    processInfos = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths]
+
+    etl_content_predicates = get_basic_etl_content_predicates(processInfos)
+
+    for p in processInfos:
+        etl_content_predicates.append(ZeroContextSwitchCountPredicate(p))
+        etl_content_predicates.append(ZeroReadyThreadCountPredicate(p))
+
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE),
+                    ProfileTestFileExpectation("*.dmp", N_PROCESSES, DMP_MIN_SIZE),
+                    EtlContentExpectation("*.etl", etl_content_predicates)]
+    evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)
+
+@testcase(suite = _profile_suite, name = "Multiple target processes (many)", fixture = ProfileTestsFixture())
+def test_multiple_target_processes_many():
+    N_PROCESSES = 128
+    pths = launch_pth_processes(N_PROCESSES)
+
+    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+        wait_for_etwprof_session()
+
+        for event in pths.values():
+            event.signal()
+
+        etwprof.wait()
+
+        for p in pths:
+            p.check()
+
+    processInfos = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths]
+    evaluate_simple_profile_test(list_files_in_dir(fixture.outdir), "*.etl", processInfos)
+
+@testcase(suite = _profile_suite, name = "Multiple target processes (many), various operations", fixture = ProfileTestsFixture())
+def test_multiple_target_processes_many_various_ops():
+    from itertools import chain
+
+    N_PROCESSES_DO_NOTHING = 64
+    N_PROCESSES_BURN_CPU_5_SEC = 4
+    N_PROCESSES_WAIT_1_SEC = 4
+    N_PROCESSES_WAIT_5_SEC = 4
+
+    pths_do_nothing = launch_pth_processes(N_PROCESSES_DO_NOTHING)
+    pths_5_sec_cpu_burn = launch_pth_processes(N_PROCESSES_BURN_CPU_5_SEC, "BurnCPU5s")
+    pths_wait_1_sec = launch_pth_processes(N_PROCESSES_WAIT_1_SEC, "Wait1Sec")
+    pths_wait_5_sec = launch_pth_processes(N_PROCESSES_WAIT_5_SEC, "Wait5Sec")
+
+    pths_all_processes = lambda : chain(pths_do_nothing, pths_5_sec_cpu_burn, pths_wait_1_sec, pths_wait_5_sec)
+    pths_all_events = lambda : chain(pths_do_nothing.values(), pths_5_sec_cpu_burn.values(), pths_wait_1_sec.values(), pths_wait_5_sec.values())
+
+    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+        wait_for_etwprof_session()
+
+        for event in pths_all_events():
+            event.signal()
+
+        etwprof.wait()
+
+        for p in pths_all_processes():
+            p.check()
+
+    # The different operations require different ETL content predicates, so let's construct them
+    process_infos_do_nothing = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths_do_nothing]
+    process_infos_5_sec_cpu_burn = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths_5_sec_cpu_burn]
+    process_infos_waits = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in chain(pths_wait_1_sec, pths_wait_5_sec)]
+
+    predicates_do_nothing = get_basic_etl_content_predicates(process_infos_do_nothing)
+    predicates_5_sec_cpu_burn = get_basic_etl_content_predicates(process_infos_5_sec_cpu_burn)
+    predicates_waits = get_basic_etl_content_predicates(process_infos_waits, sampled_profile_min=0)
+
+    # Ugliness: get_basic_etl_content_predicates also prepares a process exact match predicate. That's no good for us
+    #   here, as we need a single one, containing all processes. So we remove each one manually, then create a single one,
+    #   containing all of the processes. Far from ideal, but it's simple, and it works...
+    predicates_all = [p
+                      for p in chain(predicates_do_nothing, predicates_5_sec_cpu_burn, predicates_waits)
+                      if not isinstance(p, ProcessExactMatchPredicate)]
+    
+    process_predicate = ProcessExactMatchPredicate(process_infos_do_nothing +
+                                                   process_infos_5_sec_cpu_burn +
+                                                   process_infos_waits + [unknown_process])
+    predicates_all.extend(get_basic_predicates_for_unknown_process())
+    predicates_all.append(process_predicate)
+
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE),
+                    EtlContentExpectation("*.etl", predicates_all)]
+
+    evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)
 
 @testcase(suite = _profile_suite, name = "Unknown process (name)", fixture = ProfileTestsFixture())
 def test_unknown_process_name():
@@ -480,3 +576,34 @@ def test_user_providers_all_kw_220():
                                                                     sampled_profile_min=0))
     expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE), EtlContentExpectation("*.etl", etl_content_predicates)]
     evaluate_profile_test(filelist, expectations)
+
+@testcase(suite = _profile_suite, name = "User providers, multiple processes", fixture = ProfileTestsFixture())
+def test_user_providers_multiple_processes():
+    if is_win7_or_earlier():
+        return  # Not supported on Win 7
+
+    pths = launch_pth_processes(3, "MBTLEmitAll")
+
+    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile, [get_enable_string_for_all_providers()]) as etwprof:
+        wait_for_etwprof_session()
+
+        for event in pths.values():
+            event.signal()
+
+        etwprof.wait()
+
+        for p in pths:
+            p.check()
+
+    processInfos = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths]
+
+    etl_content_predicates = get_basic_etl_content_predicates(processInfos, sampled_profile_min=0)
+
+    expected_user_provider_event_counts = get_all_1_user_provider_event_counts()
+
+    for p in processInfos:
+        etl_content_predicates.append(GeneralEventCountByProviderAndEventIdSubsetPredicate(p, expected_user_provider_event_counts))
+
+    expectations = [ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE),
+                    EtlContentExpectation("*.etl", etl_content_predicates)]
+    evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)

@@ -184,7 +184,7 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
 
         return;
     }
-    
+
     EVENT_HEADER* pHeader = &pEventRecord->EventHeader;
     if (pHeader->ProviderId == StackWalkGuid) {
         if (FilterStackWalkEvent (pHeader->EventDescriptor.Opcode, pFilterData, pEventRecord->UserData)) {

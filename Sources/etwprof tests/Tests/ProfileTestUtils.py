@@ -50,9 +50,11 @@ class ProfileTestsFixture(ETWProfFixture):
         return self._outfile
 
 class PTHProcess(AsyncTimeoutedProcess):
-    def __init__(self, operation = "DoNothing"):
+    def __init__(self, operation: Optional[str] = None):
+
+
         super().__init__(os.path.join(TestConfig._testbin_folder_path, PTH_EXE_NAME),
-                         [operation],
+                         [operation if operation else "DoNothing"],
                          timeout = TestConfig.get_process_timeout())
 
         # Native Win32 event used for synchronizing with PTH
@@ -535,6 +537,14 @@ class GeneralEventCountByProviderAndEventIdSubsetPredicate(Predicate):
 
         return True
     
+def launch_pth_processes(n: int, operation: Optional[str] = None) -> Dict[PTHProcess, Win32NamedEvent]:
+    result = {}
+    for i in range(0, n):
+        p = PTHProcess(operation)
+        result[p] = p.get_event_for_sync()
+
+    return result
+    
 # Some common provider GUIDs and event IDs
 PERF_INFO_GUID = UUID("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc")
 PERF_INFO_SAMPLED_PROFILE_ID = 46
@@ -585,7 +595,14 @@ class EtlContentExpectation():
                 if not p.evaluate(trace_data):
                     fail(f"ETL content predicate ({type(p)}) is not satisfied: {p.explain()}")
 
-def get_basic_etl_content_predicates(target_processes: List[ProcessInfo],
+def get_basic_predicates_for_unknown_process()-> List[Predicate]:
+    global unknown_process
+
+    driver_images = [ImageInfo("afd.sys"), ImageInfo("beep.sys"), ImageInfo("ntfs.sys")]
+
+    return [ImageSubsetPredicate(unknown_process, driver_images)]
+
+def get_basic_etl_content_predicates(target_processes: Iterable[ProcessInfo],
                                       thread_count_min: int = 1,
                                       sampled_profile_min: int = 1,
                                       additional_predicates: Optional[List[Predicate]] = None,
@@ -593,13 +610,13 @@ def get_basic_etl_content_predicates(target_processes: List[ProcessInfo],
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
+
     # "Imply" the presence of the "Unknown" process, containing driver images
     global unknown_process
-    driver_images = [ImageInfo("afd.sys"), ImageInfo("beep.sys"), ImageInfo("ntfs.sys")]
-    predicates.append(ImageSubsetPredicate(unknown_process, driver_images))
+    predicates.extend(get_basic_predicates_for_unknown_process())
 
     all_processes = [unknown_process]
-    all_processes.extend(target_processes)    
+    all_processes.extend(target_processes)
     
     predicates.append(ProcessExactMatchPredicate(all_processes))
 

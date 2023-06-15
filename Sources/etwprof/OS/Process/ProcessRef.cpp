@@ -3,8 +3,6 @@
 #include "Utility/Asserts.hpp"
 #include "OS/FileSystem/Utility.hpp"
 
-#include <iostream>  // TODO remove
-
 namespace ETWP {
 
 namespace {
