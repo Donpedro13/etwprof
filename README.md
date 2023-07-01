@@ -46,8 +46,8 @@ Download
 ------------
 
 The latest version of etwprof is __0.2__ (released 2019-06-30). Binary distributions are available:
-* [Release version](https://poprcdn.blob.core.windows.net/cdn/etwprof/0.2/etwprof_0.2_release.zip)
-* [Debug version](https://poprcdn.blob.core.windows.net/cdn/etwprof/0.2/etwprof_0.2_debug.zip)
+* [Release version](https://poprcdn2.blob.core.windows.net/cdn/etwprof/0.2/etwprof_0.2_release.zip)
+* [Debug version](https://poprcdn2.blob.core.windows.net/cdn/etwprof/0.2/etwprof_0.2_debug.zip)
 
 For previous versions, see [Releases](Documentation/Releases.md). For a list of fixes and improvements, check [CHANGELOG.txt](Misc/CHANGELOG.txt).
 
