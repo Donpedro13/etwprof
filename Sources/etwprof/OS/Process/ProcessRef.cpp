@@ -2,6 +2,7 @@
 
 #include "Utility/Asserts.hpp"
 #include "OS/FileSystem/Utility.hpp"
+#include "OS/Utility/Win32Utils.hpp"
 
 namespace ETWP {
 
@@ -66,18 +67,19 @@ bool ProcessRef::Wait (uint32_t timeout/* = INFINITE*/) const
 {
     ETWP_ASSERT (m_options & Synchronize);
 
-    switch (WaitForSingleObject (m_handle, timeout)) {
-        case WAIT_OBJECT_0:
+    switch (Win32::WaitForObject(m_handle, timeout))
+    {
+        case Win32::WaitResult::Signaled:
             return true;
 
-        case WAIT_TIMEOUT:
+        case Win32::WaitResult::Timeout:
             return false;
 
-        case WAIT_FAILED:
-            [[fallthrough]];
+        case Win32::WaitResult::Failed:
+            [[fallthrough]];    // Shouldn't occur with this class
         default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from WaitForSingleObject in " __FUNCTIONW__  L"!");
-            
+            ETWP_DEBUG_BREAK ();
+
             return false;
     }
 }

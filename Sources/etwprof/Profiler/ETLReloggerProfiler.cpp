@@ -8,6 +8,7 @@
 #include "OS/FileSystem/Utility.hpp"
 #include "OS/Process/Utility.hpp"
 #include "OS/Synchronization/LockableGuard.hpp"
+#include "OS/Utility/Win32Utils.hpp"
 
 #include "ProfilerCommon.hpp"
 
@@ -131,9 +132,8 @@ bool ETLReloggerProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut
     ETWP_ASSERT (m_hWorkerThread != nullptr);
 
     // Poll thread
-    DWORD pollResult = WaitForSingleObject (m_hWorkerThread, 0);
-    switch (pollResult) {
-        case WAIT_OBJECT_0: {
+    switch (Win32::WaitForObject(m_hWorkerThread, 0)) {
+        case Win32::WaitResult::Signaled: {
             LockableGuard resultLockGuard (&m_resultLock);
 
             m_profiling = false;
@@ -141,16 +141,17 @@ bool ETLReloggerProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut
                 m_state = IProfiler::State::Finished;
 
             CloseHandles ();
-        }
-        case WAIT_TIMEOUT:
+
             break;
-        case WAIT_FAILED:
+        }
+
+        case Win32::WaitResult::Timeout:
+            break;
+
+        case Win32::WaitResult::Failed:
             ETWP_DEBUG_BREAK_STR (L"Wait failed on profiler thread!");
             // Hope for the best...
             break;
-        default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
-                                  L"WaitForSingleObject in profiler!");
     }
 
     if (!m_profiling) {
@@ -184,17 +185,13 @@ void ETLReloggerProfiler::StopImpl ()
     ETWP_ASSERT (m_hWorkerThread != nullptr);
 
     // Wait for profiler thread synchronously
-    DWORD pollResult = WaitForSingleObject (m_hWorkerThread, INFINITE);
-    switch (pollResult) {
-        case WAIT_OBJECT_0:
+    switch (Win32::WaitForObject(m_hWorkerThread, INFINITE)) {
+        case Win32::WaitResult::Signaled:
             break;
-        case WAIT_FAILED:
-            // Fallthrough
-        case WAIT_TIMEOUT:
-            // Fallthrough
+
         default:
-            ETWP_DEBUG_BREAK_STR (L"Impossible value returned from"
-                                  L"WaitForSingleObject in profiler!");
+            ETWP_DEBUG_BREAK_STR(L"Impossible value returned from"
+                                 L"WaitForSingleObject in profiler!");
     }
 
     m_profiling = false;

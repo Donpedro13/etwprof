@@ -264,10 +264,9 @@ bool Application::DoProfile ()
                         L"Stopping profiling command");
 
     std::vector<DWORD> targetPIDs;
-    // In case of emulate mode, we won't have process HANDLEs to open, obviously
     std::unique_ptr<WaitableProcessGroup> pTargetGroup;
 
-    if (!m_args.emulate) {
+    if (!m_args.emulate) {  // In case of emulate mode, we won't have process HANDLEs to open, obviously
         Result<std::unique_ptr<WaitableProcessGroup>> targetsResult = GetTargets ();
         if (!targetsResult.has_value()) {
             Log (LogSeverity::Error, L"Unable to get targets for profiling: " + targetsResult.error ());

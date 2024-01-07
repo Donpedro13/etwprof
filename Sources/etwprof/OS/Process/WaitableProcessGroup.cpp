@@ -58,7 +58,7 @@ void WaitableProcessGroup::Add (ProcessRef&& process)
     AddImpl (std::move (process));
 }
 
-void WaitableProcessGroup::Add(std::vector<ProcessRef>&& processes)
+void WaitableProcessGroup::Add (std::vector<ProcessRef>&& processes)
 {
     std::lock_guard guard (m_lock);
 
@@ -208,7 +208,7 @@ void WaitableProcessGroup::CancelWait (ProcessWaitContext* pWaitContext, bool wa
 
 void WaitableProcessGroup::AddImpl (ProcessRef&& process)
 {
-    ETWP_ASSERT (process.GetOptions ()& ProcessRef::Synchronize);
+    ETWP_ASSERT (process.GetOptions () & ProcessRef::Synchronize);
 
     const PID pid = process.GetPID ();
     const HANDLE handle = process.GetHandle ();
