@@ -71,9 +71,10 @@ namespace TID
             try
             {
                 traceData = new TraceData(input);
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
-                FailWithMessage ($"Unable to gather data from the ETL file: {e.Message}");
+                FailWithMessage($"Unable to gather data from the ETL file: {e.Message}");
             }
 
             try

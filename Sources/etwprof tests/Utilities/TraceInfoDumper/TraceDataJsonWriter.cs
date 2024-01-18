@@ -36,22 +36,22 @@ namespace TID
             foreach (var item in traceData.ProcessLifetimesByProcess)
             {
                 writer.WriteStartObject();
-                    writer.WritePropertyName("process");
-                    WriteProcess(writer, item.Key);
+                writer.WritePropertyName("process");
+                WriteProcess(writer, item.Key);
 
-                    writer.WritePropertyName("lifetimeInfo");
-                    writer.WriteStartObject();
+                writer.WritePropertyName("lifetimeInfo");
+                writer.WriteStartObject();
 
-                        writer.WritePropertyName("startTimeMsStamp");
-                        writer.WriteValue(item.Value.StartTime);
+                writer.WritePropertyName("startTimeMsStamp");
+                writer.WriteValue(item.Value.StartTime);
 
-                        writer.WritePropertyName("endTimeMsStamp");
-                        writer.WriteValue(item.Value.EndTime);
+                writer.WritePropertyName("endTimeMsStamp");
+                writer.WriteValue(item.Value.EndTime);
 
-                        writer.WritePropertyName("exitCode");
-                        writer.WriteValue(item.Value.ExitCode);
+                writer.WritePropertyName("exitCode");
+                writer.WriteValue(item.Value.ExitCode);
 
-                    writer.WriteEndObject();
+                writer.WriteEndObject();
 
                 writer.WriteEndObject();
             }
@@ -80,7 +80,7 @@ namespace TID
 
                 writer.WriteEndArray();
 
-                writer.WriteEndObject();;
+                writer.WriteEndObject(); ;
             }
 
             writer.WriteEndArray();
@@ -191,7 +191,7 @@ namespace TID
                 writer.WritePropertyName("stackCountsByProviderAndId");
                 writer.WriteStartArray();
 
-                foreach(var countByProviderAndId in item.Value)
+                foreach (var countByProviderAndId in item.Value)
                 {
                     writer.WriteStartObject();
 
@@ -261,23 +261,23 @@ namespace TID
                 writer.Formatting = Formatting.Indented;
 
                 writer.WriteStartObject();
-                    writer.WritePropertyName("etlPath");
-                    writer.WriteValue(data.EtlPath);
+                writer.WritePropertyName("etlPath");
+                writer.WriteValue(data.EtlPath);
 
-                    writer.WritePropertyName("data");
-                    writer.WriteStartObject();
+                writer.WritePropertyName("data");
+                writer.WriteStartObject();
 
-                        WriteProcesses(writer, data);
-                        WriteProcessLifeTimes(writer, data);
-                        WriteImages(writer, data);
-                        WriteThreads(writer, data);
-                        WriteSampledProfileCounts(writer, data);
-                        WriteContextSwitchCounts(writer, data);
-                        WriteReadyThreadCounts(writer, data);
-                        WriteStackCounts(writer, data);
-                        WriteGeneralEventCounts(writer, data);
+                WriteProcesses(writer, data);
+                WriteProcessLifeTimes(writer, data);
+                WriteImages(writer, data);
+                WriteThreads(writer, data);
+                WriteSampledProfileCounts(writer, data);
+                WriteContextSwitchCounts(writer, data);
+                WriteReadyThreadCounts(writer, data);
+                WriteStackCounts(writer, data);
+                WriteGeneralEventCounts(writer, data);
 
-                    writer.WriteEndObject();
+                writer.WriteEndObject();
                 writer.WriteEndObject();
             }
         }
