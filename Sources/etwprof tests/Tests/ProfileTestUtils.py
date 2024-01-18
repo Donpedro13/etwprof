@@ -91,7 +91,7 @@ class ProfileTestOptions(Flag):
     DEFAULT = 0
     TARGET_ID_NAME = auto()
 
-@dataclass()
+@dataclass
 class ProcessInfo():
     image_name: str
     pid: int
@@ -101,6 +101,12 @@ class ProcessInfo():
     
     def __hash__(self) -> int:
         return hash((self.image_name.lower(), self.pid))
+    
+@dataclass
+class ProcessLifetimeInfo():
+    startTimestampMs: int
+    endTimestampMs: int
+    exitCode: int
 
 @dataclass
 class ImageInfo():
@@ -120,6 +126,7 @@ class ThreadInfo():
 class TraceData():
     etl_path: str
     processes_by_pid: dict[int, ProcessInfo]
+    process_lifetimes_by_process: dict[ProcessInfo, ProcessLifetimeInfo]
     images_by_process: dict[ProcessInfo, List[ImageInfo]]
     threads_by_process: dict[ProcessInfo, List[ThreadInfo]]
     sampled_profile_counts_by_process: dict[ProcessInfo, int]
@@ -139,7 +146,23 @@ class TraceData():
         processes_by_pid: dict[int, ProcessInfo] = {}
         for process_dict in data["processList"]:
             pid = int(process_dict["pid"])
+
+            # We make an incorrect assumption: "a process' PID uniquely identifies it". This is, of course, not true, as
+            #   PIDs (or in general, client ids, to be more precise...) can and will be reused by Windows. But this
+            #   assumption saves us a lot of complexity, and so far, there was not a single test failure because of this.
+            # Even though test cases should fail if this ever happens, we still assert here just to make sure...
+            assert(pid not in processes_by_pid)
+
             processes_by_pid[pid] = ProcessInfo(process_dict["imageName"], pid)
+
+        process_lifetimes_by_process: dict[ProcessInfo, ProcessLifetimeInfo] = {}
+        for lifetime_dict in data["processLifetimeInfoList"]:
+            process_info = processes_by_pid[lifetime_dict["process"]["pid"]]
+            lifetime_info_dict = lifetime_dict["lifetimeInfo"]
+            process_lifetimes_by_process[process_info] = ProcessLifetimeInfo(lifetime_info_dict["startTimeMsStamp"],
+                                                                             lifetime_info_dict["endTimeMsStamp"],
+                                                                             lifetime_info_dict["exitCode"])
+            
 
         images_by_process: dict[ProcessInfo, List[ImageInfo]] = {}
         for image_list in data["imageLists"]:
@@ -200,6 +223,7 @@ class TraceData():
 
         return cls(etl_path,
                    processes_by_pid,
+                   process_lifetimes_by_process,
                    images_by_process,
                    threads_by_process,
                    sampled_profile_counts_by_process,
@@ -277,6 +301,64 @@ class ProcessExactMatchPredicate(Predicate):
             self._explanation = f"""The given process list is not equivalent with the one in the trace data.
             \tExpected: {trace_data.processes_by_pid}
             \tActual: {self._processes}"""
+
+            return False
+
+class ProcessLifetimeTransience(Flag):
+    NO_TIME_PRESENT = 0
+    END_TIME_PRESENT = auto()
+    START_TIME_PRESENT = auto()
+
+class ProcessLifetimeMatcher():
+    def __init__(self, transience: ProcessLifetimeTransience, exitcode: Optional[int]):
+        self._transience = transience
+        self._exitcode = exitcode
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def match(self, lifetime_info: ProcessLifetimeInfo) -> bool:
+        if self._transience & ProcessLifetimeTransience.END_TIME_PRESENT:
+            if not lifetime_info.endTimestampMs:
+                return False
+        else:
+            if lifetime_info.endTimestampMs:
+                return False
+            
+        if self._transience & ProcessLifetimeTransience.START_TIME_PRESENT:
+            if not lifetime_info.startTimestampMs:
+                return False
+        else:
+            if lifetime_info.startTimestampMs:
+                return False
+        
+        if lifetime_info.exitCode != self._exitcode:
+            return False
+        
+        return True
+    
+PROCESS_LIFETIME_EXITED_W_ZERO = ProcessLifetimeMatcher(ProcessLifetimeTransience.END_TIME_PRESENT, 0)
+PROCESS_LIFETIME_STARTED_THEN_EXITED_W_ZERO = ProcessLifetimeMatcher(ProcessLifetimeTransience.START_TIME_PRESENT | ProcessLifetimeTransience.END_TIME_PRESENT, 0)
+PROCESS_LIFETIME_STARTED = ProcessLifetimeMatcher(ProcessLifetimeTransience.START_TIME_PRESENT, None)
+PROCESS_LIFETIME_UNKNOWN = ProcessLifetimeMatcher(ProcessLifetimeTransience.NO_TIME_PRESENT, None)
+
+class ProcessLifetimePredicate(Predicate):
+    def __init__(self, process: ProcessInfo, lifetime_matcher: ProcessLifetimeMatcher):
+        self._process = process
+        self._lifetime_matcher = lifetime_matcher
+
+    def evaluate(self, trace_data: TraceData) -> bool:
+        if self._process not in trace_data.process_lifetimes_by_process:
+            self._explanation = "No lifetime is associated with the given process"
+            return False
+        
+        if self._lifetime_matcher.match(trace_data.process_lifetimes_by_process[self._process]):
+            self._explanation = "The given process lifetime matches the one in the trace data."
+            return True
+        else:
+            self._explanation = f"""The given process lifetime does not match the one in the trace data.
+            \tExpected: {self._lifetime_matcher}
+            \tActual: {trace_data.process_lifetimes_by_process[self._process]}"""
 
             return False
         
@@ -600,13 +682,14 @@ def get_basic_predicates_for_unknown_process()-> List[Predicate]:
 
     driver_images = [ImageInfo("afd.sys"), ImageInfo("beep.sys"), ImageInfo("ntfs.sys")]
 
-    return [ImageSubsetPredicate(unknown_process, driver_images)]
+    return [ImageSubsetPredicate(unknown_process, driver_images), ProcessLifetimePredicate(unknown_process, PROCESS_LIFETIME_UNKNOWN)]
 
 def get_basic_etl_content_predicates(target_processes: Iterable[ProcessInfo],
                                       thread_count_min: int = 1,
                                       sampled_profile_min: int = 1,
                                       additional_predicates: Optional[List[Predicate]] = None,
-                                      stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None):
+                                      stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None,
+                                      process_lifetime_matcher: ProcessLifetimeMatcher = PROCESS_LIFETIME_EXITED_W_ZERO):
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
@@ -627,6 +710,7 @@ def get_basic_etl_content_predicates(target_processes: Iterable[ProcessInfo],
         predicates.append(ImageSubsetPredicate(p, images))
         predicates.append(ThreadCountGTEPredicate(p, thread_count_min))
         predicates.append(SampledProfileCountGTEPredicate(p, sampled_profile_min))
+        predicates.append(ProcessLifetimePredicate(p, process_lifetime_matcher))
 
         if not stack_count_predicate:
             # We expect call stacks for sampled profiles

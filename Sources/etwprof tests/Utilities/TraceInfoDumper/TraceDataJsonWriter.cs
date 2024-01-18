@@ -15,6 +15,7 @@ namespace TID
             writer.WriteValue(process.Id);
             writer.WriteEndObject();
         }
+
         private static void WriteProcesses(JsonWriter writer, TraceData traceData)
         {
             writer.WritePropertyName("processList");
@@ -22,6 +23,37 @@ namespace TID
             foreach (var process in traceData.ProcessesByPID)
             {
                 WriteProcess(writer, process.Value);
+            }
+
+            writer.WriteEndArray();
+        }
+
+        private static void WriteProcessLifeTimes(JsonWriter writer, TraceData traceData)
+        {
+            writer.WritePropertyName("processLifetimeInfoList");
+            writer.WriteStartArray();
+
+            foreach (var item in traceData.ProcessLifetimesByProcess)
+            {
+                writer.WriteStartObject();
+                    writer.WritePropertyName("process");
+                    WriteProcess(writer, item.Key);
+
+                    writer.WritePropertyName("lifetimeInfo");
+                    writer.WriteStartObject();
+
+                        writer.WritePropertyName("startTimeMsStamp");
+                        writer.WriteValue(item.Value.StartTime);
+
+                        writer.WritePropertyName("endTimeMsStamp");
+                        writer.WriteValue(item.Value.EndTime);
+
+                        writer.WritePropertyName("exitCode");
+                        writer.WriteValue(item.Value.ExitCode);
+
+                    writer.WriteEndObject();
+
+                writer.WriteEndObject();
             }
 
             writer.WriteEndArray();
@@ -236,6 +268,7 @@ namespace TID
                     writer.WriteStartObject();
 
                         WriteProcesses(writer, data);
+                        WriteProcessLifeTimes(writer, data);
                         WriteImages(writer, data);
                         WriteThreads(writer, data);
                         WriteSampledProfileCounts(writer, data);

@@ -207,7 +207,9 @@ def test_ctrl_c_stop():
         # Since PTH is blocked most of the time while etwprof is running, it's very likely that we won't have any
         # sampled profile events, at all
         target_process = ProcessInfo(PTH_EXE_NAME, pth.pid)
-        etl_content_predicates = get_basic_etl_content_predicates([target_process], sampled_profile_min=0)
+        etl_content_predicates = get_basic_etl_content_predicates([target_process],
+                                                                  sampled_profile_min=0,
+                                                                  process_lifetime_matcher = PROCESS_LIFETIME_UNKNOWN)
 
         etl_content_predicates.append(ZeroContextSwitchCountPredicate(target_process))
         etl_content_predicates.append(ZeroReadyThreadCountPredicate(target_process))

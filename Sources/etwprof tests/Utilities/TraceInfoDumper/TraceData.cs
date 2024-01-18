@@ -77,7 +77,20 @@ namespace TID
                 public string ImageName { get; }
             }
 
-            public struct Image
+        public struct ProcessLifetimeInfo
+        {
+            public ProcessLifetimeInfo(long? startTime, long? endTime, int? exitCode)
+            {
+                StartTime = startTime;
+                EndTime = endTime;
+                ExitCode = exitCode;
+            }
+            public long? StartTime { get; }
+            public long? EndTime { get; }
+            public int? ExitCode { get; }
+        }
+
+        public struct Image
             {
                 public Image(string imageName)
                 {
@@ -141,7 +154,7 @@ namespace TID
 
                     // For "general" event enumeration, TraceProcessor does not provide Process objects, but raw
                     // process Ids. So we collect statistics in two steps: first, we gather all events of all processes,
-                    // and associate them with process Ids. Then, we "swap" the process Ids for "frist-class" process
+                    // and associate them with process Ids. Then, we "swap" the process Ids for "first-class" process
                     // structs.
                     EventStatisticsCreatorConsumer eventStatisticsCreator = new EventStatisticsCreatorConsumer();
                     trace.Use(eventStatisticsCreator);
@@ -164,6 +177,11 @@ namespace TID
                     Process ownProcess = new Process(process.Id, process.ImageName);
                     ProcessesByPID.Add(process.Id, ownProcess);
 
+                    long? startTimeMsStamp = process.CreateTime?.DateTimeOffset.ToUnixTimeMilliseconds();
+                    long? endTimeMsStamp = process.ExitTime?.DateTimeOffset.ToUnixTimeMilliseconds();
+                    ProcessLifetimeInfo lifetimeInfo = new ProcessLifetimeInfo(startTimeMsStamp, endTimeMsStamp, process.ExitCode);
+                    ProcessLifetimesByProcess.Add(ownProcess, lifetimeInfo);
+
                     foreach (IImage image in process.Images)
                     {
                         if (!ImagesByProcess.ContainsKey(ownProcess))
@@ -174,7 +192,7 @@ namespace TID
                 }
             }
 
-            private void GatherThreadData(IThreadDataSource threadDataSource)
+        private void GatherThreadData(IThreadDataSource threadDataSource)
             {
                 foreach (IThread thread in threadDataSource.Threads)
                 {
@@ -325,6 +343,7 @@ namespace TID
             public string EtlPath { get; }
 
             public Dictionary<int, Process> ProcessesByPID { get; } = new Dictionary<int, Process>();
+            public Dictionary<Process, ProcessLifetimeInfo> ProcessLifetimesByProcess { get; } = new Dictionary<Process, ProcessLifetimeInfo>();
             public Dictionary<Process, List<Image>> ImagesByProcess { get; } = new Dictionary<Process, List<Image>>();
             public Dictionary<Process, List<Thread>> ThreadsByProcess { get; } = new Dictionary<Process, List<Thread>>();
             public Dictionary<Process, int> SampledProfileCountsByProcess { get; } = new Dictionary<Process, int>();
