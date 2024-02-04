@@ -224,9 +224,9 @@ void ETLReloggerProfiler::Profile ()
     bool compress = m_options & Compress;
 
     try {
-        TraceRelogger filteringRelogger (FilterEventForProfiling,
+        ProfileEventFilter eventFilter (filterData);
+        TraceRelogger filteringRelogger (&eventFilter,
                                          rawOutputPath,
-                                         &filterData,
                                          m_options & Compress);
 
         std::wstring errorMsg;

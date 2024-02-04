@@ -9,10 +9,11 @@
 
 #include "IETWBasedProfiler.hpp"
 
+#include "OS/ETW/TraceRelogger.hpp"
+
 #include "OS/Utility/Time.hpp"
 
 struct ITraceEvent;
-class TraceRelogger;
 
 template<>
 struct std::hash<ETWP::IETWBasedProfiler::ProviderInfo> {
@@ -75,8 +76,19 @@ struct ProfileFilterData {
     bool  cswitch;
 };
 
-// context is a pointer to a ProfileFilterData instance
-void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, void* context);
+class ProfileEventFilter final : public IEventFilter {
+public:
+    ProfileEventFilter (ProfileFilterData& filterData);
+
+    virtual void FilterEvent (ITraceEvent* pEvent, TraceRelogger* pRelogger) override;
+
+private:
+    ProfileFilterData& m_filterData;
+};
+
+void FilterEventForProfiling (ITraceEvent* pEvent,
+                              TraceRelogger* pRelogger,
+                              ProfileFilterData* pFilterData);
 
 // This code snippet is copied here from KernelTraceControl.h in the Windows SDK
 #define EVENT_TRACE_MERGE_EXTENDED_DATA_NONE                0x00000000

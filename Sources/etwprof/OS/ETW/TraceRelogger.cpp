@@ -9,10 +9,9 @@ namespace ETWP {
 
 namespace Impl {
 
-TraceReloggerCallback::TraceReloggerCallback (TraceRelogger* parent, void* context):
+TraceReloggerCallback::TraceReloggerCallback (TraceRelogger* parent):
     m_refCount (0),
-    m_parent (parent),
-    m_context (context)    
+    m_parent (parent)  
 {
 }
 
@@ -53,11 +52,10 @@ STDMETHODIMP TraceReloggerCallback::OnBeginProcessTrace (ITraceEvent* /*headerEv
 
 STDMETHODIMP TraceReloggerCallback::OnEvent (ITraceEvent* event, ITraceRelogger* /*relogger*/)
 {
-    m_parent->m_callback (event, m_parent, m_context);
+    m_parent->m_pEventFilter->FilterEvent (event, m_parent);
 
     return S_OK;
 }
-
 
 STDMETHODIMP TraceReloggerCallback::OnFinalizeProcessTrace (ITraceRelogger* /*relogger*/)
 {
@@ -66,21 +64,21 @@ STDMETHODIMP TraceReloggerCallback::OnFinalizeProcessTrace (ITraceRelogger* /*re
 
 }   // namespace Impl
 
+IEventFilter::~IEventFilter()
+{
+}
+
 TraceRelogger::InitException::InitException (const std::wstring& msg):
     Exception (msg)
 {
 
 }
 
-TraceRelogger::TraceRelogger (const EventCallback& eventCallback,
+TraceRelogger::TraceRelogger (IEventFilter* pEventFilter,
                               const std::wstring& outFilePath,
-                              void* context,
                               bool compress):
-    m_callback (eventCallback),
-    m_context (context)
+    m_pEventFilter (pEventFilter)
 {
-    ETWP_ASSERT (eventCallback != nullptr);
-
     // COM should be initialized by clients, but let's be sure...
     if (FAILED (CoInitializeEx (nullptr, COINIT_MULTITHREADED)))
         throw InitException (L"Unable to initialize COM!");
@@ -97,7 +95,7 @@ TraceRelogger::TraceRelogger (const EventCallback& eventCallback,
     if (FAILED (m_relogger->SetOutputFilename (pathCopy)))
         throw InitException (L"Unable to set outpath path on ITraceRelogger COM object!");
 
-    m_callbackImpl.reset (new Impl::TraceReloggerCallback (this, m_context));
+    m_callbackImpl.reset (new Impl::TraceReloggerCallback (this));
 
     m_relogger->RegisterCallback (m_callbackImpl.get ());
 }

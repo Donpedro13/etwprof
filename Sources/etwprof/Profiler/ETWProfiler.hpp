@@ -11,6 +11,7 @@
 
 #include "OS/ETW/ETWSessionInterfaces.hpp"
 #include "OS/Process/WaitableProcessGroup.hpp"
+
 #include "OS/Synchronization/CriticalSection.hpp"
 #include "OS/Utility/ProfileInterruptRate.hpp"
 
@@ -20,8 +21,7 @@ namespace ETWP {
 
 class TraceRelogger;
 
-// Thread-safe class (except when stated otherwise) that can profile a process
-//   using ETW
+// Thread-safe class (except when stated otherwise) that can profile a process using ETW.
 class ETWProfiler final : public IETWBasedProfiler {
 public:
     // Meaning of State values:
@@ -33,7 +33,7 @@ public:
     //   Error          ->  Profiling stopped because of an error
 
     ETWProfiler (const std::wstring& outputPath,
-                 WaitableProcessGroup* pTargets,
+                 const std::vector<DWORD>& targetPIDs,
                  const ProfileRate& samplingRate,
                  IETWBasedProfiler::Flags options);
     virtual ~ETWProfiler () override;
@@ -61,7 +61,7 @@ private:
 
     std::unique_ptr<IKernelETWSession> m_ETWSession;
 
-    WaitableProcessGroup*      m_pTargets;
+    WaitableProcessGroup       m_targets;
     ProviderInfos              m_userProviders;
 
     ProfileRate                m_samplingRate;

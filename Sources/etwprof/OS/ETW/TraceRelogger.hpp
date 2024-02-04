@@ -28,7 +28,7 @@ class TraceReloggerCallback : public ITraceEventCallback {
 public:
     ETWP_DISABLE_COPY_AND_MOVE (TraceReloggerCallback);
 
-    TraceReloggerCallback (TraceRelogger* parent, void* context);
+    TraceReloggerCallback (TraceRelogger* parent);
 
     STDMETHODIMP QueryInterface (const IID& iid, void **obj);
     STDMETHODIMP_ (ULONG) AddRef ();
@@ -40,12 +40,18 @@ public:
 
 private:
     DWORD          m_refCount;
-    void*          m_context;
 
     TraceRelogger* m_parent;
 };
 
 }   // namespace Impl
+
+class IEventFilter {
+public:
+    virtual ~IEventFilter ();
+
+    virtual void FilterEvent (ITraceEvent* pEvent, TraceRelogger* pRelogger) = 0;
+};
 
 // 1.) Create an instance with your callback
 // 2.) Add a session or a trace file to relog
@@ -65,9 +71,8 @@ public:
     using EventCallback = std::function<void (ITraceEvent*, TraceRelogger*, void*)>;
 
     // Might throw InitException
-    TraceRelogger (const EventCallback& eventCallback,
+    TraceRelogger (IEventFilter* pEventFilter,
                    const std::wstring& outFilePath,
-                   void* context,
                    bool compress);
     ~TraceRelogger ();
 
@@ -81,8 +86,7 @@ public:
     bool StartRelogging (std::wstring* pErrorOut);
 
 private:
-    EventCallback m_callback;
-    void*         m_context;
+    IEventFilter* m_pEventFilter;
 
     std::unique_ptr<OnExit> m_comUninitializer;
 

@@ -125,14 +125,22 @@ bool FilterContextSwitchEvent (UCHAR opcode, ProfileFilterData* pFilterData, voi
     }
 }
 
-bool FilterProcessEvent (UCHAR opcode, ProfileFilterData* pFilterData, void* pUserData)
+bool FilterProcessEvent (UCHAR opcode,
+                         ProfileFilterData* pFilterData,
+                         void* pUserData)
 {
     const ETWConstants::ProcessDataStub* pData =
         reinterpret_cast<const ETWConstants::ProcessDataStub*> (pUserData);
 
-    const bool profiledProcess = pFilterData->targetPIDs.contains (pData->m_processID);
-    if (profiledProcess && opcode == ETWConstants::PEndOpcode)
-        pFilterData->targetPIDs.erase (pData->m_processID);
+    bool profiledProcess = pFilterData->targetPIDs.contains (pData->m_processID);
+
+    if (profiledProcess) {
+        switch (opcode) {
+        case ETWConstants::PEndOpcode:
+            pFilterData->targetPIDs.erase (pData->m_processID);
+            break;
+        }
+    }
 
     return profiledProcess;
 }
@@ -175,9 +183,19 @@ void ThreadRegistry::DeleteThreadsMarkedForDeletion (TickCount markTimeThreshold
     }
 }
 
-void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, void* context)
+ProfileEventFilter::ProfileEventFilter (ProfileFilterData& filterData): m_filterData (filterData)
 {
-    ProfileFilterData* pFilterData = static_cast<ProfileFilterData*> (context);
+}
+
+void ProfileEventFilter::FilterEvent (ITraceEvent* pEvent, TraceRelogger* pRelogger)
+{
+    FilterEventForProfiling (pEvent, pRelogger, &m_filterData);
+}
+
+void FilterEventForProfiling (ITraceEvent* pEvent,
+                              TraceRelogger* pRelogger,
+                              ProfileFilterData* pFilterData)
+{
     EVENT_RECORD* pEventRecord;
     if (FAILED (pEvent->GetEventRecord (&pEventRecord))) {
         Log (LogSeverity::Warning, L"Event dropped in relog (GetEventRecord failed)!");
@@ -230,7 +248,10 @@ void FilterEventForProfiling (ITraceEvent* pEvent, TraceRelogger* pRelogger, voi
             }
         }
     } else if (pHeader->ProviderId == ProcessGuid) {
-        if (FilterProcessEvent (pHeader->EventDescriptor.Opcode, pFilterData, pEventRecord->UserData)) {
+        if (FilterProcessEvent (pHeader->EventDescriptor.Opcode,
+                                pFilterData,
+                                pEventRecord->UserData))
+        {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))
                 Log (LogSeverity::Warning, L"Injecting event failed: " + errorMsg);

@@ -344,7 +344,7 @@ bool Application::DoProfile ()
 
         try {
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
-                                                pTargetGroup.get (),
+                                                targetPIDs,
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
                                                 options));
         } catch (const IProfiler::InitException& e) {

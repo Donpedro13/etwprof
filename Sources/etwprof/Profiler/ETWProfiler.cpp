@@ -16,6 +16,7 @@
 
 #include "OS/FileSystem/Utility.hpp"
 
+#include "OS/Process/ProcessRef.hpp"
 #include "OS/Process/Utility.hpp"
 
 #include "OS/Synchronization/LockableGuard.hpp"
@@ -31,14 +32,14 @@
 namespace ETWP {
 
 ETWProfiler::ETWProfiler (const std::wstring& outputPath,
-                          WaitableProcessGroup* pTargets,
+                          const std::vector<DWORD>& targetPIDs,
                           const ProfileRate& samplingRate,
                           IETWBasedProfiler::Flags options):
     m_lock (),
     m_resultLock (),
     m_hWorkerThread (nullptr),
     m_ETWSession (nullptr),
-    m_pTargets (pTargets),
+    m_targets (),
     m_userProviders (),
     m_samplingRate (samplingRate),
     m_options (static_cast<Options> (options)),
@@ -46,13 +47,22 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     m_state (State::Unstarted),
     m_errorFromWorkerThread ()
 {
-    ETWP_ASSERT (pTargets != nullptr);
-
     if (!PathValid (m_outputPath))
         throw InitException (L"Output ETL path is invalid!");
 
-    if (pTargets->GetSize () == 0)
+    if (targetPIDs.empty ())
         throw InitException (L"No targets to profile!");
+
+    // Open HANDLEs to the target processes, so we can wait for them
+    for (auto pid : targetPIDs) {
+        try {
+            ProcessRef target (pid, ProcessRef::Synchronize);
+            m_targets.Add (std::move (target));
+        } catch (ProcessRef::InitException& e) {            
+            throw InitException (L"Unable to open HANDLE for target process with pid " +
+                                 std::to_wstring (pid) + L"(" + e.GetMsg () + L")" + L"!");
+        }
+    }
 
     if (m_options & StackCache && GetWinVersion() < BaseWinVersion::Win8)
 		throw InitException (L"ETW stack caching is requested, but Windows version is less than 8!");
@@ -256,7 +266,7 @@ void ETWProfiler::Profile ()
     ETWP_DEBUG_ONLY (OnExit stateChecker ([this]() { ETWP_ASSERT (GetState () != State::Running); }));
 
     std::unordered_set<DWORD> targetPIDs;
-    for (const auto& [pid, _] : *m_pTargets)
+    for (const auto& [pid, _] : m_targets)
         targetPIDs.insert (pid);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
@@ -281,9 +291,9 @@ void ETWProfiler::Profile ()
     try {
         // Create and set up the relogger before starting the kernel logger. This way we minimize the time between
         // relogging (~consuming) events, and the kernel logger emitting events into buffers
-        TraceRelogger filteringRelogger (FilterEventForProfiling,
+        ProfileEventFilter eventFilter (filterData);
+        TraceRelogger filteringRelogger (&eventFilter,
                                          rawOutputPath,
-                                         &filterData,
                                          m_options & Compress);
 
         if (ETWP_ERROR (!m_ETWSession->Start ())) {
@@ -458,7 +468,7 @@ IProfiler::State ETWProfiler::GetState ()
 
 bool ETWProfiler::HaveAllTargetProcessesExited ()
 {
-    return m_pTargets->IsAllFinished ();
+    return m_targets.IsAllFinished ();
 }
 
 void ETWProfiler::WaitForProfilerThread ()
