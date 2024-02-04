@@ -67,8 +67,7 @@ bool ProcessRef::Wait (uint32_t timeout/* = INFINITE*/) const
 {
     ETWP_ASSERT (m_options & Synchronize);
 
-    switch (Win32::WaitForObject(m_handle, timeout))
-    {
+    switch (Win32::WaitForObject(m_handle, timeout)) {
         case Win32::WaitResult::Signaled:
             return true;
 
@@ -77,6 +76,7 @@ bool ProcessRef::Wait (uint32_t timeout/* = INFINITE*/) const
 
         case Win32::WaitResult::Failed:
             [[fallthrough]];    // Shouldn't occur with this class
+
         default:
             ETWP_DEBUG_BREAK ();
 
