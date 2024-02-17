@@ -10,6 +10,7 @@
 #include "IETWBasedProfiler.hpp"
 
 #include "OS/ETW/TraceRelogger.hpp"
+#include "OS/Process/ProcessLifetimeEventSource.hpp"
 
 #include "OS/Utility/Time.hpp"
 
@@ -26,6 +27,8 @@ struct std::hash<ETWP::IETWBasedProfiler::ProviderInfo> {
 };
 
 namespace ETWP {
+
+class ProcessLifetimeEventSource;
 
 // Class for recording thread IDs of interest. Besides deleting, you can also mark threads for deletion. These can be
 //   deleted later manually by calling DeleteThreadsMarkedForDeletion, with a time threshold
@@ -73,10 +76,12 @@ struct ProfileFilterData {
     std::unordered_set<IETWBasedProfiler::ProviderInfo> userProviders;
     std::unordered_set<UINT_PTR> stackKeys;  // For stack cache filtering (when enabled)
     std::unordered_set<DWORD> targetPIDs;
-    bool  cswitch;
+
+    bool cswitch;
+    bool profileChildren;
 };
 
-class ProfileEventFilter final : public IEventFilter {
+class ProfileEventFilter final : public IEventFilter, public ProcessLifetimeEventSource {
 public:
     ProfileEventFilter (ProfileFilterData& filterData);
 
@@ -88,7 +93,8 @@ private:
 
 void FilterEventForProfiling (ITraceEvent* pEvent,
                               TraceRelogger* pRelogger,
-                              ProfileFilterData* pFilterData);
+                              ProfileFilterData* pFilterData,
+                              ProcessLifetimeEventSource* pProcessLifetimeEventSource);
 
 // This code snippet is copied here from KernelTraceControl.h in the Windows SDK
 #define EVENT_TRACE_MERGE_EXTENDED_DATA_NONE                0x00000000

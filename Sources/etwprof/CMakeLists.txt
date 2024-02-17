@@ -41,14 +41,18 @@ SET(etwprof_sources
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Minidump.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Minidump.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessLifetimeEventSource.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessLifetimeEventSource.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessLifetimeObserver.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessLifetimeObserver.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessRef.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessRef.hpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessList.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/ProcessList.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Utility.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/Utility.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Process/WaitableProcessGroup.hpp
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Stream/OStreamManipulators.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Stream/OStreamManipulators.cpp
@@ -64,6 +68,7 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/Event.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Synchronization/LockableGuard.hpp
 
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/OSTypes.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/ProfileInterruptRate.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/ProfileInterruptRate.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/Utility/Time.hpp

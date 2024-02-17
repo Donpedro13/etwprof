@@ -1,11 +1,10 @@
 #ifndef ETWP_TIME_HPP
 #define ETWP_TIME_HPP
 
-#include <windows.h>
+#include "OSTypes.hpp"
 
 namespace ETWP {
 
-using TickCount = ULONGLONG;
 using Timeout = uint32_t;
 const Timeout Infinite = INFINITE;
 

@@ -45,6 +45,8 @@ public:
     void WriteLine (const wchar_t* pString);
     void Write (wchar_t wChar);
 
+    void ClearLine ();
+
     ConsoleOStream& operator<< (const std::wstring& string);
     ConsoleOStream& operator<< (const wchar_t* pString);
     ConsoleOStream& operator<< (wchar_t wChar);

@@ -10,7 +10,9 @@
 #include "IETWBasedProfiler.hpp"
 
 #include "OS/ETW/ETWSessionInterfaces.hpp"
+
 #include "OS/Process/WaitableProcessGroup.hpp"
+#include "OS/Process/ProcessLifetimeObserver.hpp"
 
 #include "OS/Synchronization/CriticalSection.hpp"
 #include "OS/Utility/ProfileInterruptRate.hpp"
@@ -21,8 +23,9 @@ namespace ETWP {
 
 class TraceRelogger;
 
-// Thread-safe class (except when stated otherwise) that can profile a process using ETW.
-class ETWProfiler final : public IETWBasedProfiler {
+// Thread-safe class (except when stated otherwise) that can profile a process using ETW. It's also an event source for
+//   the lifetime of profiled processes
+class ETWProfiler final : public IETWBasedProfiler, public ProcessLifetimeObserver {
 public:
     // Meaning of State values:
     //   Unstarted      ->  Initialized, but not started yet
@@ -45,6 +48,8 @@ public:
     virtual bool IsFinished (State* pResultOut, std::wstring* pErrorOut) override;
 
     virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
+
+    virtual uint16_t GetNumberOfProfiledProcesses () override;
 
 private:
     using ProviderInfos = std::vector<IETWBasedProfiler::ProviderInfo>;
@@ -72,6 +77,10 @@ private:
     std::wstring m_errorFromWorkerThread;
 
     static unsigned int ProfileHelper (void* instance);
+
+    // ProcessLifetimeObserver
+    virtual void ProcessStarted (PID pid, PID parentPID) override;
+    virtual void ProcessEnded (PID pid, PID parentPID) override;
 
     void StopImpl ();   // Not thread safe
 

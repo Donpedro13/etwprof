@@ -7,6 +7,7 @@ class ConsoleOStream;
 
 using OStreamManipulator = void (*)(ConsoleOStream*);
 
+void Clearl (ConsoleOStream* stream);
 void Endl (ConsoleOStream* stream);
 
 void ColorReset (ConsoleOStream* stream);

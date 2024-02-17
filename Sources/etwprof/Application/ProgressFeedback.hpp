@@ -34,6 +34,9 @@ public:
 
     void SetState (State newState);
 
+    void SetOperationString (const std::wstring& operation);
+    void SetDetailString (const std::wstring& detail);
+
 private:
     std::wstring m_operation;
     std::wstring m_detail;

@@ -205,7 +205,7 @@ void Application::PrintUsage () const
         LR"(etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
     etwprof --help
 
@@ -217,6 +217,7 @@ void Application::PrintUsage () const
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
+    --children       Profile child processes, as well
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
@@ -282,6 +283,39 @@ bool Application::DoProfile ()
         ETWP_ASSERT (pTargetGroup->GetSize () == targetPIDs.size ());
     }
 
+    // Determine the display name and PID for profiling feedback
+    // The logic here is quite elaborate, as depending on whether you are using emulate mode, and if there are
+    //  > 1 processes to profile, determining some of these values are either not possible or the result would
+    //  be ambiguous
+    std::wstring targetDisplayName;
+    std::wstring targetDisplayPID;
+    if (m_args.emulate) {
+        ETWP_ASSERT (m_args.targetIsPID);
+
+        targetDisplayPID = std::to_wstring (m_args.targetPID);
+    } else {
+        if (m_args.targetIsPID) {
+            targetDisplayPID = std::to_wstring (m_args.targetPID);
+
+            // If there is a single process to profile *or* we have multiple, *but* all of their names are the same,
+            //  then we have an unambigous process name to display
+            const std::wstring& firstProcessName = pTargetGroup->begin ()->second.GetName ();
+            const bool allProcessNamesEqual = std::all_of (pTargetGroup->begin (),
+                                                           pTargetGroup->end(),
+                                                           [&firstProcessName] (const auto& pair) {
+                                                               return pair.second.GetName () == firstProcessName;
+                                                           });
+
+            if (allProcessNamesEqual)
+                targetDisplayName = firstProcessName;
+        } else {
+            targetDisplayName = m_args.targetName;
+
+            if (pTargetGroup->GetSize () == 1)
+                targetDisplayPID = std::to_wstring (pTargetGroup->begin ()->first);
+        }
+    }
+
     ETWP_ASSERT (m_args.emulate == (pTargetGroup == nullptr));
 
     std::wstring finalOutputPath = m_args.output;
@@ -320,6 +354,9 @@ bool Application::DoProfile ()
 
 	if (m_args.stackCache)
 		options |= IETWBasedProfiler::StackCache;
+
+    if (m_args.profileChildren)
+        options |= IETWBasedProfiler::ProfileChildren;
 
     if (m_args.emulate) {
         Log (LogSeverity::Info, L"Constructing \"emulate mode\" profiler");
@@ -393,14 +430,27 @@ bool Application::DoProfile ()
     ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?
                                            ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
     
-    std::wstring targetIdString;
-    if (pTargetGroup != nullptr)
-        targetIdString = pTargetGroup->begin()->second.GetName();
-    const std::wstring targetPIDOrInfo = targetPIDs.size () == 1 ?
-        std::to_wstring (*targetPIDs.begin ()) :
-        std::to_wstring (targetPIDs.size ()) + L" processes";
+    size_t nProcessesProfiling = targetPIDs.size ();
+    auto getDetailString = [&] () {
+        std::wstring result = targetDisplayName;
+        if (!targetDisplayPID.empty ())
+            result += L" (" + targetDisplayPID + L")";
+
+        if (m_args.profileChildren)
+            result += L" and child processes";
+
+        nProcessesProfiling = m_pProfiler->GetNumberOfProfiledProcesses ();
+        
+        if (nProcessesProfiling <= 1)
+            return result;
+
+        result += L" (" + std::to_wstring (nProcessesProfiling) + L" processes)";
+
+        return result;
+    };
+
     ProgressFeedback feedback (L"Profiling",
-                               targetIdString + L" (" + targetPIDOrInfo + L")",
+                               getDetailString (),
                                feebackStyle,
                                ProgressFeedback::State::Running);
     
@@ -408,6 +458,7 @@ bool Application::DoProfile ()
     std::wstring profilingErrorMsg;
     while (!m_pProfiler->IsFinished (&state, &profilingErrorMsg)) {
         feedback.PrintProgress ();
+        feedback.SetDetailString (getDetailString ());
 
         constexpr DWORD kProgressFrequencyMs = 500;
         Sleep (kProgressFrequencyMs);
@@ -433,6 +484,7 @@ bool Application::DoProfile ()
             break;
     }
 
+    feedback.SetDetailString (getDetailString ());
     feedback.PrintProgressLine ();
 
     if (state == IProfiler::State::Error) {

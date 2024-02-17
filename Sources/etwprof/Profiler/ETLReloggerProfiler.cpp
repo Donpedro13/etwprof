@@ -173,6 +173,11 @@ bool ETLReloggerProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo&
     return true;
 }
 
+uint16_t ETLReloggerProfiler::GetNumberOfProfiledProcesses ()
+{
+    return 1;
+}
+
 void ETLReloggerProfiler::StopImpl ()
 {
     if (ETWP_ERROR (!m_profiling))
@@ -215,7 +220,8 @@ void ETLReloggerProfiler::Profile ()
                                      {m_userProviders.begin (), m_userProviders.end () },
                                      {},
                                      {m_targetPID},
-                                     bool (m_options & RecordCSwitches) };
+                                     bool (m_options & RecordCSwitches),
+                                     bool (m_options & ProfileChildren) };
 
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;

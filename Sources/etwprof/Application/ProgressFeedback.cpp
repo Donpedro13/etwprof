@@ -22,7 +22,7 @@ ProgressFeedback::ProgressFeedback (const std::wstring& process,
 void ProgressFeedback::PrintProgress ()
 {
     if (m_animated)
-        COut () << L'\r';
+        COut () << Clearl;
     else if (m_currentStatePrinted)
         return;
 
@@ -31,7 +31,7 @@ void ProgressFeedback::PrintProgress ()
     if (!m_detail.empty ())
         COut () << L" " << FgColorWhite << m_detail;
 
-    COut () << L'\t' << FgColorCyan << L"[ ";
+    COut () << L' ' << FgColorCyan << L"[ ";
 
     switch (m_state) {
         case State::Idle:
@@ -83,6 +83,20 @@ void ProgressFeedback::SetState (State newState)
         m_currentStatePrinted = false;
 
     m_state = newState;
+}
+
+void ProgressFeedback::SetOperationString (const std::wstring& operation)
+{
+    m_operation = operation;
+
+    m_currentStatePrinted = false;
+}
+
+void ProgressFeedback::SetDetailString (const std::wstring& detail)
+{
+    m_detail = detail;
+
+    m_currentStatePrinted = false;
 }
 
 }   // namespace ETWP

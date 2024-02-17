@@ -17,6 +17,7 @@ namespace Impl { struct WaitCallbackContext; }
 class WaitableProcessGroup final {
 public:
     using ProcessesByPIDMap = std::unordered_map<PID, ProcessRef>;
+    using Size = uint16_t;   // DWORD, used of PIDs on Windows
 
     class ConstIterator {    // Needed for atomic iteration
     public:
@@ -59,7 +60,9 @@ public:
     void Add (std::vector<ProcessRef>&& processes);
     bool Delete (PID pid);
 
-    size_t GetSize () const;
+    Size GetSize () const;
+    Size GetWaitingSize () const;
+    Size GetFinishedSize () const;
 
     bool WaitForAll (Timeout timeout = Infinite);
     bool IsAllFinished ();

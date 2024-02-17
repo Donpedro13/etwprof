@@ -165,6 +165,32 @@ void ConsoleOStream::Write (wchar_t wChar)
     Write (std::wstring (1, wChar));
 }
 
+void ConsoleOStream::ClearLine ()
+{
+    if (m_type != Type::Console)
+        return;
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (ETWP_ERROR (!GetConsoleScreenBufferInfo (m_stdHandle, &csbi)))
+        return;
+
+    const DWORD lineLength = csbi.dwSize.X;
+    COORD lineStartCoord = csbi.dwCursorPosition;
+    lineStartCoord.X = 0;
+
+    // Writing \r would also work, but we have lineStartCoord at hand already...
+    if (ETWP_ERROR (!SetConsoleCursorPosition (m_stdHandle, lineStartCoord)))
+        return;
+
+    DWORD nCharsWritten = 0;
+    if (ETWP_ERROR (!FillConsoleOutputCharacterW (m_stdHandle, L' ', lineLength, lineStartCoord, &nCharsWritten)))
+        return;
+
+    ETWP_ASSERT (nCharsWritten == lineLength);
+
+    ETWP_VERIFY (SetConsoleCursorPosition (m_stdHandle, lineStartCoord));
+}
+
 ConsoleOStream& ConsoleOStream::operator<< (const std::wstring& string)
 {
     Write (string);

@@ -145,16 +145,11 @@ def test_multiple_target_processes_many_various_ops():
     process_infos_5_sec_cpu_burn = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in pths_5_sec_cpu_burn]
     process_infos_waits = [ProcessInfo(PTH_EXE_NAME, p.pid) for p in chain(pths_wait_1_sec, pths_wait_5_sec)]
 
-    predicates_do_nothing = get_basic_etl_content_predicates(process_infos_do_nothing)
-    predicates_5_sec_cpu_burn = get_basic_etl_content_predicates(process_infos_5_sec_cpu_burn)
-    predicates_waits = get_basic_etl_content_predicates(process_infos_waits, sampled_profile_min=0)
+    predicates_do_nothing = get_basic_etl_content_predicates(process_infos_do_nothing, custom_process_predicates=True)
+    predicates_5_sec_cpu_burn = get_basic_etl_content_predicates(process_infos_5_sec_cpu_burn, custom_process_predicates=True)
+    predicates_waits = get_basic_etl_content_predicates(process_infos_waits, sampled_profile_min=0, custom_process_predicates=True)
 
-    # Ugliness: get_basic_etl_content_predicates also prepares a process exact match predicate. That's no good for us
-    #   here, as we need a single one, containing all processes. So we remove each one manually, then create a single one,
-    #   containing all of the processes. Far from ideal, but it's simple, and it works...
-    predicates_all = [p
-                      for p in chain(predicates_do_nothing, predicates_5_sec_cpu_burn, predicates_waits)
-                      if not isinstance(p, ProcessExactMatchPredicate)]
+    predicates_all = [p for p in chain(predicates_do_nothing, predicates_5_sec_cpu_burn, predicates_waits)]
     
     process_predicate = ProcessExactMatchPredicate(process_infos_do_nothing +
                                                    process_infos_5_sec_cpu_burn +
@@ -166,6 +161,32 @@ def test_multiple_target_processes_many_various_ops():
                     EtlContentExpectation("*.etl", predicates_all)]
 
     evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)
+
+def _test_children_impl(count:int, cascading = False):
+    operation = f"CreateChildProcessCascade{count}" if cascading else f"CreateChildProcess{count}"
+
+    filelist, processes = perform_profile_test(operation, fixture.outdir, ["--children"])
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1 + count}
+    process_predicate = ProcessSubsetAndThenCountsPredicate(processes, expected_process_counts)
+    etl_content_predicates = get_basic_etl_content_predicates (processes, custom_process_predicates=True)
+    etl_content_predicates.append (process_predicate)
+
+    expectations = [EtlContentExpectation ("*etl", etl_content_predicates),
+                    ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE)]
+
+    evaluate_profile_test(filelist, expectations)
+
+@testcase(suite = _profile_suite, name = "Child processes (few)", fixture = ProfileTestsFixture())
+def test_child_processes_few():
+    _test_children_impl(1)
+
+@testcase(suite = _profile_suite, name = "Child processes (many)", fixture = ProfileTestsFixture())
+def test_child_processes_many():
+    _test_children_impl(128)
+
+@testcase(suite = _profile_suite, name = "Child processes (cascading)", fixture = ProfileTestsFixture())
+def test_child_processes_cascading():
+    _test_children_impl(5, True)
 
 @testcase(suite = _profile_suite, name = "Unknown process (name)", fixture = ProfileTestsFixture())
 def test_unknown_process_name():

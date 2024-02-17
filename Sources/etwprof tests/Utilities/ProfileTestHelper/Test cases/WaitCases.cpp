@@ -4,6 +4,7 @@
 
 namespace PTH {
 namespace {
+
 void Wait (uint16_t waitSec)
 {
     Sleep (waitSec * 1'000);

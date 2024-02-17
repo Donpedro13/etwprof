@@ -238,6 +238,11 @@ bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& provide
     return true;
 }
 
+uint16_t ETWProfiler::GetNumberOfProfiledProcesses ()
+{
+    return m_targets.GetWaitingSize (); // m_targets has its own lock
+}
+
 unsigned int ETWProfiler::ProfileHelper (void* instance)
 {
     ETWProfiler* pInstance = static_cast<ETWProfiler*> (instance);
@@ -247,6 +252,21 @@ unsigned int ETWProfiler::ProfileHelper (void* instance)
     _endthreadex (0);
     
     return 0;   // Never reached, but the compiler isn't aware
+}
+
+void ETWProfiler::ProcessStarted (PID pid, PID /*parentPID*/)
+{
+    try {
+        ProcessRef target (pid, ProcessRef::Synchronize);
+        m_targets.Add (std::move (target));
+    } catch (const ProcessRef::InitException&) {
+        ETWP_DEBUG_BREAK ();
+    }
+}
+
+void ETWProfiler::ProcessEnded (PID pid, PID /*parentPID*/)
+{
+    m_targets.Delete (pid);
 }
 
 void ETWProfiler::StopImpl ()
@@ -274,7 +294,8 @@ void ETWProfiler::Profile ()
                                      { m_userProviders.begin (), m_userProviders.end () },
                                      {},
                                      std::move (targetPIDs),
-                                     bool (m_options & RecordCSwitches) };
+                                     bool (m_options & RecordCSwitches),
+                                     bool (m_options & ProfileChildren) };
 
 	if (GetWinVersion () < BaseWinVersion::Win8 && !filterData.userProviders.empty ()) {
 		SetErrorFromWorkerThread (L"User providers are requested, but Windows version is less than 8!");
@@ -292,6 +313,7 @@ void ETWProfiler::Profile ()
         // Create and set up the relogger before starting the kernel logger. This way we minimize the time between
         // relogging (~consuming) events, and the kernel logger emitting events into buffers
         ProfileEventFilter eventFilter (filterData);
+        eventFilter.Attach (this);
         TraceRelogger filteringRelogger (&eventFilter,
                                          rawOutputPath,
                                          m_options & Compress);

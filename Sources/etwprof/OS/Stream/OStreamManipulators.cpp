@@ -4,6 +4,11 @@
 
 namespace ETWP {
 
+void Clearl (ConsoleOStream* stream)
+{
+    stream->ClearLine ();
+}
+
 void Endl (ConsoleOStream* stream)
 {
     stream->Write (EOL);
@@ -12,8 +17,6 @@ void Endl (ConsoleOStream* stream)
 void ColorReset (ConsoleOStream* stream)
 {
     stream->ResetColors ();
-
-
 }
 
 void FgColorReset (ConsoleOStream* stream)

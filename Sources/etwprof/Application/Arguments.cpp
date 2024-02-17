@@ -251,7 +251,7 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
     ETWP_ASSERT (!IsAssignmentArg (arg));
 
     std::wstring argName = GetArgName (arg);
-    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache ; --noaction
+    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache ; --noaction ; --children
     if (argName == L"help") {
         pArgumentsOut->help = true;
 
@@ -284,7 +284,11 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
 		pArgumentsOut->noAction = true;
 
 		return true;
-	}
+	} else if (argName == L"children") {
+        pArgumentsOut->profileChildren = true;
+
+        return true;
+    }
 
     LogFailedParse (L"Unknown non-value argument!", arg);
 
@@ -907,6 +911,7 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     pArgumentsOut->verbose = parsedArgs.verbose;
     pArgumentsOut->help = parsedArgs.help;
     pArgumentsOut->debug = parsedArgs.debug;
+    pArgumentsOut->profileChildren = parsedArgs.profileChildren;
     pArgumentsOut->emulate = parsedArgs.emulate;
     pArgumentsOut->cswitch = parsedArgs.cswitch;
     pArgumentsOut->minidump = parsedArgs.minidump;
@@ -960,6 +965,12 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
 
         if (parsedArgs.samplingRate) {
             LogFailedSema (L"Sampling rate parameter is only valid for profiling!");
+
+            return false;
+        }
+
+        if (parsedArgs.profileChildren) {
+            LogFailedSema(L"Children profiling parameter is only valid for profiling!");
 
             return false;
         }

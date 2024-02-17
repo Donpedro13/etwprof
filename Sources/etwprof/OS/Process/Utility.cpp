@@ -30,10 +30,6 @@ Result<ProcessRef> CreateProcessImplNoOutput (const std::wstring& processPath,
         return Error (L"Unable to construct command line!");
     }
 
-    STARTUPINFOW startupInfo = {};
-    startupInfo.cb = sizeof startupInfo;
-    PROCESS_INFORMATION processInfo = {};
-
     SECURITY_ATTRIBUTES secAttr = {};
     secAttr.nLength = sizeof secAttr;
     secAttr.lpSecurityDescriptor = nullptr;
@@ -51,6 +47,10 @@ Result<ProcessRef> CreateProcessImplNoOutput (const std::wstring& processPath,
         return Error (L"Unable to get handle for NUL!");;
 
     OnExit devNullHandleCloser ([&hDevNull] () { CloseHandle (hDevNull); });
+
+    STARTUPINFOW startupInfo = {};
+    startupInfo.cb = sizeof startupInfo;
+    PROCESS_INFORMATION processInfo = {};
 
     startupInfo.hStdOutput = hDevNull;
     startupInfo.hStdError = hDevNull;

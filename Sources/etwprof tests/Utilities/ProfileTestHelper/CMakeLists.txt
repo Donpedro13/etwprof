@@ -12,6 +12,7 @@ SET(util_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Operations/RegUnRegETWOperation.cpp
 
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/Create100ThreadsCase.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/ChildProcessCases.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/BurnCPU5sCase.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/ETWCases.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Test cases/WaitCases.cpp"

@@ -299,11 +299,52 @@ class ProcessExactMatchPredicate(Predicate):
             return True
         else:
             self._explanation = f"""The given process list is not equivalent with the one in the trace data.
-            \tExpected: {trace_data.processes_by_pid}
-            \tActual: {self._processes}"""
+            \tExpected: {self._processes}
+            \tActual: {trace_data.processes_by_pid}"""
 
             return False
+        
+# This is a weird predicate, used for testing child process debugging. First, it checks for the presence of given
+#   processes (both name and PID, as usual), but it's not an error if additional processes exist in the trace ("subset").
+#   Then, it checks for the count of processes, stritctly by image name (we don't know the PIDs of most of child
+#   processes in advance...)
+class ProcessSubsetAndThenCountsPredicate(Predicate):
+    def __init__(self, processes: List[ProcessInfo], process_counts_by_name: Dict[str, int]):
+        self._expected_processes = processes
+        self._expected_process_counts = process_counts_by_name
 
+    def evaluate(self, trace_data: TraceData) -> bool:
+        if not set(self._expected_processes).issubset (set(trace_data.processes_by_pid.values())):
+            self._explanation = "The given ProcessInfo list is not a subset of the one in the trace data."
+            return False
+        
+        actual_process_counts = {}
+        for p in trace_data.processes_by_pid.values():
+            actual_process_counts[p.image_name] = actual_process_counts.get(p.image_name, 0) + 1
+
+        # Check if any process is present in the trace, but not in the reference
+        for p in actual_process_counts:
+            if p not in self._expected_process_counts:
+                self._explanation = f"Unexpected process \"{p}\" found in the trace data."
+                return False
+
+        for p, c in self._expected_process_counts.items():
+            # Check if any process is present in the reference, but not in the trace
+            if p not in actual_process_counts:
+                self._explanation = f"Process \"{p}\" not found in the trace data."
+                return False
+
+            # Finally, check if the counts match
+            if actual_process_counts[p] != c:
+                self._explanation = f"""The process count for {p} is not equal with the count in the trace data.
+                \tExpected: {actual_process_counts[p]}
+                \tActual: {c}"""
+
+                return False
+
+        self._explanation = "The given process list is a subset of the one in the trace data, and process counts also match."
+        return True
+        
 class ProcessLifetimeTransience(Flag):
     NO_TIME_PRESENT = 0
     END_TIME_PRESENT = auto()
@@ -689,19 +730,21 @@ def get_basic_etl_content_predicates(target_processes: Iterable[ProcessInfo],
                                       sampled_profile_min: int = 1,
                                       additional_predicates: Optional[List[Predicate]] = None,
                                       stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None,
-                                      process_lifetime_matcher: ProcessLifetimeMatcher = PROCESS_LIFETIME_EXITED_W_ZERO):
+                                      process_lifetime_matcher: ProcessLifetimeMatcher = PROCESS_LIFETIME_EXITED_W_ZERO,
+                                      custom_process_predicates: bool = False):
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
 
-    # "Imply" the presence of the "Unknown" process, containing driver images
-    global unknown_process
-    predicates.extend(get_basic_predicates_for_unknown_process())
+    if not custom_process_predicates:
+        # "Imply" the presence of the "Unknown" process, containing driver images
+        global unknown_process
+        predicates.extend(get_basic_predicates_for_unknown_process())
 
-    all_processes = [unknown_process]
-    all_processes.extend(target_processes)
-    
-    predicates.append(ProcessExactMatchPredicate(all_processes))
+        all_processes = [unknown_process]
+        all_processes.extend(target_processes)
+
+        predicates.append(ProcessExactMatchPredicate(all_processes))
 
     for p in target_processes:
         images = [ImageInfo("ntdll.dll"), ImageInfo("kernel32.dll"), ImageInfo("kernelbase.dll")]

@@ -5,12 +5,11 @@
 
 #include <string>
 
+#include "OS/Utility/OSTypes.hpp"
+
 #include "Utility/Exception.hpp"
 
 namespace ETWP {
-
-using PID = DWORD;
-const PID InvalidPID = 0;
 
 // Class for wrapping an already existing, OS-native process. The process HANDLE is kept open until the object exists.
 class ProcessRef final {

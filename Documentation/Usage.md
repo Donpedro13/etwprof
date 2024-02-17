@@ -7,7 +7,7 @@ Please see "Usage" on the [Readme page](../README.md) first.
 etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
     etwprof --help
 
@@ -19,6 +19,7 @@ etwprof
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
+    --children       Profile child processes, as well
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
@@ -39,6 +40,8 @@ If you specify the executable's name (instead of the process ID), and there are 
 Provides even more verbose output than `-v --verbose`. Intermediate results are retained (e.g. the unmerged `.etl` output).
 * `--mflags`  
 See the [documentation](https://msdn.microsoft.com/en-us/library/windows/desktop/ms680519(v=vs.85).aspx) for possible values.
+* `--children`  
+Children processes are included recursively. Because ETW process start/end events are used for this feature, if ETW events are dropped, etwprof might miss child processes, or never stop profiling.
 * `--outdir`  
 With this option, etwprof will choose a convenient output filename for you.
 * `--outdir`, `--output`  

@@ -64,6 +64,7 @@ struct SampledProfileDataStub {
 struct ProcessDataStub {
     UINT_PTR m_processKey;
     DWORD    m_processID;
+    DWORD    m_parentProcessID;
     // Other members follow in the "real" struct
 };
 

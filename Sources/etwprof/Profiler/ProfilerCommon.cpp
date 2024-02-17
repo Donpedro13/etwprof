@@ -5,6 +5,7 @@
 #include "OS/ETW/ETWConstants.hpp"
 #include "OS/ETW/TraceRelogger.hpp"
 #include "OS/FileSystem/Utility.hpp"
+#include "OS/Process/ProcessLifetimeEventSource.hpp"
 
 #include "Utility/Asserts.hpp"
 
@@ -127,16 +128,35 @@ bool FilterContextSwitchEvent (UCHAR opcode, ProfileFilterData* pFilterData, voi
 
 bool FilterProcessEvent (UCHAR opcode,
                          ProfileFilterData* pFilterData,
-                         void* pUserData)
+                         void* pUserData,
+                         ProcessLifetimeEventSource* pProcessLifetimeEventSource)
 {
     const ETWConstants::ProcessDataStub* pData =
         reinterpret_cast<const ETWConstants::ProcessDataStub*> (pUserData);
 
     bool profiledProcess = pFilterData->targetPIDs.contains (pData->m_processID);
 
+    if (!profiledProcess &&
+        pFilterData->profileChildren &&
+        opcode == ETWConstants::PStartOpcode &&
+        pFilterData->targetPIDs.contains (pData->m_parentProcessID))
+    {
+        // A child process of one of our current targets started, let's add it to our bookkeeping
+        pFilterData->targetPIDs.insert (pData->m_processID);
+        profiledProcess = true;
+    }
+
     if (profiledProcess) {
         switch (opcode) {
+        case ETWConstants::PStartOpcode:
+            pProcessLifetimeEventSource->NotifyProcessStarted (pData->m_processID,
+                                                               pData->m_parentProcessID);
+
+            break;
         case ETWConstants::PEndOpcode:
+            pProcessLifetimeEventSource->NotifyProcessEnded (pData->m_processID,
+                                                             pData->m_parentProcessID);
+
             pFilterData->targetPIDs.erase (pData->m_processID);
             break;
         }
@@ -189,12 +209,13 @@ ProfileEventFilter::ProfileEventFilter (ProfileFilterData& filterData): m_filter
 
 void ProfileEventFilter::FilterEvent (ITraceEvent* pEvent, TraceRelogger* pRelogger)
 {
-    FilterEventForProfiling (pEvent, pRelogger, &m_filterData);
+    FilterEventForProfiling (pEvent, pRelogger, &m_filterData, this);
 }
 
 void FilterEventForProfiling (ITraceEvent* pEvent,
                               TraceRelogger* pRelogger,
-                              ProfileFilterData* pFilterData)
+                              ProfileFilterData* pFilterData,
+                              ProcessLifetimeEventSource* pProcessLifetimeEventSource)
 {
     EVENT_RECORD* pEventRecord;
     if (FAILED (pEvent->GetEventRecord (&pEventRecord))) {
@@ -250,7 +271,8 @@ void FilterEventForProfiling (ITraceEvent* pEvent,
     } else if (pHeader->ProviderId == ProcessGuid) {
         if (FilterProcessEvent (pHeader->EventDescriptor.Opcode,
                                 pFilterData,
-                                pEventRecord->UserData))
+                                pEventRecord->UserData,
+                                pProcessLifetimeEventSource))
         {
             std::wstring errorMsg;
             if (!pRelogger->Inject (pEvent, &errorMsg))
