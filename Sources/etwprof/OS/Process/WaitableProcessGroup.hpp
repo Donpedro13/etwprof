@@ -18,13 +18,34 @@ class WaitableProcessGroup final {
 public:
     using ProcessesByPIDMap = std::unordered_map<PID, ProcessRef>;
 
-    class ConstIterator : public ProcessesByPIDMap::const_iterator {    // Needed for atomic iteration
+    class ConstIterator {    // Needed for atomic iteration
     public:
-        ConstIterator (ProcessesByPIDMap::const_iterator&& origIt, const WaitableProcessGroup* pParent);
+        using base_iterator = ProcessesByPIDMap::const_iterator;
+
+        using iterator_category = base_iterator::iterator_category;
+        using difference_type = base_iterator::difference_type;
+        using value_type = base_iterator::value_type;
+        using pointer = base_iterator::pointer;
+        using reference = base_iterator::reference;
+        
+        ConstIterator (const base_iterator& origIt, const WaitableProcessGroup* pParent);
+        ConstIterator (const ConstIterator& rhs);
+        ConstIterator (const ConstIterator&& rhs) noexcept;
         ~ConstIterator ();
+
+        reference operator*() const { return *m_baseIt; }
+        pointer operator->() { return m_baseIt.operator->(); }
+
+        ConstIterator& operator++() { m_baseIt++; return *this; }
+        ConstIterator operator++ (int) { ConstIterator tmp = *this; ++(*this); return tmp; }
+
+        friend bool operator== (const ConstIterator& a, const ConstIterator& b) { return a.m_baseIt == b.m_baseIt; };
+        friend bool operator!= (const ConstIterator& a, const ConstIterator& b) { return a.m_baseIt != b.m_baseIt; };
 
     private:
         const WaitableProcessGroup* m_pParent;
+        base_iterator m_baseIt;
+
     };
 
     WaitableProcessGroup (std::vector<ProcessRef>&& processes);

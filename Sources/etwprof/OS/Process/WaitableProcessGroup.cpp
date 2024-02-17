@@ -21,12 +21,22 @@ struct WaitCallbackContext {
 
 }   // namespace
 
-WaitableProcessGroup::ConstIterator::ConstIterator (ProcessesByPIDMap::const_iterator&& origIt,
+WaitableProcessGroup::ConstIterator::ConstIterator (const base_iterator& origIt,
                                                     const WaitableProcessGroup* pParent):
-    ProcessesByPIDMap::const_iterator (std::move (origIt)),
-    m_pParent (pParent)
+    m_pParent (pParent),
+    m_baseIt (origIt)
 {
     m_pParent->m_lock.lock ();
+}
+
+WaitableProcessGroup::ConstIterator::ConstIterator (const ConstIterator& rhs):
+    ConstIterator (rhs.m_baseIt, rhs.m_pParent)
+{
+}
+
+WaitableProcessGroup::ConstIterator::ConstIterator (const ConstIterator&& rhs) noexcept :
+    ConstIterator (rhs.m_baseIt, rhs.m_pParent) // Cheeky, ugly, but works
+{
 }
 
 WaitableProcessGroup::ConstIterator::~ConstIterator ()
