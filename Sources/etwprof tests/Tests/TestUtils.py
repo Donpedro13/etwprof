@@ -10,7 +10,7 @@ import tempfile
 import time
 
 class Win32NamedEvent:
-    def __init__(self, name, create_or_open = False):
+    def __init__(self, name, create_or_open = False, auto_reset = False):
         from ctypes.wintypes import BOOL, HANDLE, LPCWSTR, LPVOID
 
         # Constants and function prototypes
@@ -21,7 +21,7 @@ class Win32NamedEvent:
         CreateEventW.argtypes = [LPVOID, BOOL, BOOL, LPCWSTR]
         CreateEventW.restype = HANDLE
 
-        self._handle = CreateEventW(0, True, False, name)
+        self._handle = CreateEventW(0, not auto_reset, False, name)
 
         if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS and not create_or_open:
             self._cleanup()

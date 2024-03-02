@@ -41,7 +41,7 @@ Provides even more verbose output than `-v --verbose`. Intermediate results are 
 * `--mflags`  
 See the [documentation](https://msdn.microsoft.com/en-us/library/windows/desktop/ms680519(v=vs.85).aspx) for possible values.
 * `--children`  
-Children processes are included recursively. Because ETW process start/end events are used for this feature, if ETW events are dropped, etwprof might miss child processes, or never stop profiling.
+Child processes are included recursively. Because ETW process start/end events are used for this feature, if ETW events are dropped, etwprof might miss child processes.
 * `--outdir`  
 With this option, etwprof will choose a convenient output filename for you.
 * `--outdir`, `--output`  
@@ -62,19 +62,19 @@ Debugging feature. You can feed an already existing `.etl` file to etwprof with 
 Examples
 ----------
 
-* `etwprof profile -t=notepad.exe -o=D:\temp\mytrace.etl`  
-Profiles notepad.exe, writes result to the specified etl file.
-* `etwprof profile -t=17816 --outdir=%TMP% --cswitch --compress=7z`  
+* `etwprof profile -t=notepad.exe -o=D:\temp\mytrace.etl`
+Profiles all notepad.exe processes, writes result to the specified etl file.
+* `etwprof profile -t=17816 --outdir=%TMP% --cswitch --compress=7z`
 Profiles process with PID 17816, writes result to the temporary directory, collects context switch events, utilizes 7-zip compression.
-* `etwprof profile -v --nologo -t=notepad.exe --outdir=D:\temp -m --rate=100`  
-Profiles with a sample rate of 100 Hz, creates a minidump, outputs verbose diagnostic messages.
-* `etwprof profile @"D:\folder\some parameters.txt"`  
+* `etwprof profile -v --nologo -t=notepad.exe --outdir=D:\temp -m --rate=100 --children`
+Profiles with a sample rate of 100 Hz, profiles child processes, creates a minidump, outputs verbose diagnostic messages.
+* `etwprof profile @"D:\folder\some parameters.txt"`
 Reads command-line parameters from the specified command file.
-* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-RPC`  
+* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-RPC`
 Collects all events from the `Microsoft-Windows-RPC` provider.
 * `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=*MyTraceloggerProvider:0xff`
 Collects events from TraceLogging provider named `MyTraceloggerProvider`, but only those with a keyword that matches bitmask `0xff`.
-* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x0200000010000000:4'stack'`  
+* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x0200000010000000:4'stack'`
 Collects events from `Microsoft-Windows-Win32k`, but ignores those **not** matching the specified keyword, and retains events with level 4 and below only. Also collects stack traces.
-* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x10000000:'stack'+Microsoft-Windows-RPC+37f342ed-e45c-4b26-b3fe-450af9817fcd:0xff`  
+* `etwprof profile -t=notepad.exe --outdir=%TMP% --enable=Microsoft-Windows-Win32k:~0x10000000:'stack'+Microsoft-Windows-RPC+37f342ed-e45c-4b26-b3fe-450af9817fcd:0xff`
 Enables various providers with various options.

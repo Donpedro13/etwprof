@@ -5,12 +5,13 @@
 */
 
 #include <windows.h>
-#include <tlhelp32.h>
 
 #include <iostream>
 
 #include "OperationRegistrar.hpp"
+#include "Utility.hpp"
 
+namespace PTH {
 namespace {
 
 BOOL WINAPI CtrlHandler (DWORD fdwCtrlType)
@@ -32,42 +33,10 @@ BOOL WINAPI CtrlHandler (DWORD fdwCtrlType)
 
 void Usage ()
 {
-    std::wcerr << L"Usage: ProfileTestHelper.exe <operation name> [--nowait]" << std::endl;
+    std::wcerr << L"Usage: ProfileTestHelper.exe <operation name> [--nowait | --wait]" << std::endl;
 }
 
-[[noreturn]] void Fail (const std::wstring& msg)
-{
-    std::wcerr << L"ERROR: " << msg << std::endl;
-
-    exit (EXIT_FAILURE);
-}
-
-DWORD GetParentPID ()
-{
-    DWORD ownPID = GetCurrentProcessId ();
-
-    HANDLE hSnapshot = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE)
-        Fail (L"Unable to create process snapshot!");
-
-    PROCESSENTRY32W processEntry;
-    processEntry.dwSize = sizeof processEntry;
-
-    if (!Process32FirstW (hSnapshot, &processEntry))
-        Fail (L"Unable to get info for the first process in process snapshot!");
-
-    do {
-        if (processEntry.th32ProcessID == ownPID) {
-            CloseHandle (hSnapshot);
-
-            return processEntry.th32ParentProcessID;
-        }
-    } while (Process32NextW (hSnapshot, &processEntry));
-
-    Fail (L"Unable to find process in process snapshot!");
-}
-
-void WaitForStartSignal ()
+WinHandle GetStartSignalHandle ()
 {
     // Construct the name of the event used for synchronization
     const DWORD parentPID = GetParentPID ();
@@ -78,15 +47,45 @@ void WaitForStartSignal ()
     //   included in the name. From the parent's perspective: it first needs to start this child (it needs the child
     //   PID, after all), and tries to create the event, but then we might already get to this point here in the
     //   child process.
-    HANDLE hEvent = CreateEventW (nullptr, FALSE, FALSE, eventName.c_str ());
+    HANDLE hEvent = CreateEventW (nullptr, TRUE, FALSE, eventName.c_str ());
     if (hEvent == nullptr)
         Fail (L"Unable to open event for synchronization!");
 
-    const DWORD waitResult = WaitForSingleObject (hEvent, INFINITE);
-    if (waitResult != WAIT_OBJECT_0)
-        Fail (L"Wait failed on event!");
+    return hEvent;
+}
 
-    CloseHandle (hEvent);
+WinHandle GetCancelSignalHandle ()
+{
+    const std::wstring eventName = L"PTH_event_global_cancel";
+    HANDLE hEvent = CreateEventW (nullptr, TRUE, FALSE, eventName.c_str ());
+    if (hEvent == nullptr)
+        Fail (L"Unable to open event for synchronization!");
+
+    return hEvent;
+}
+
+enum class SignalResult {
+    Start,
+    Cancel
+};
+
+SignalResult WaitForStartOrCancelSignal ()
+{
+    WinHandle hStart = GetStartSignalHandle ();
+    WinHandle hCancel = GetCancelSignalHandle ();
+    HANDLE handles[] = { hStart.Get (), hCancel.Get () };
+
+    const DWORD waitResult = WaitForMultipleObjects (2, handles, FALSE, INFINITE);
+    switch (waitResult) {
+        case WAIT_OBJECT_0:
+            return SignalResult::Start;
+
+        case WAIT_OBJECT_0 + 1:
+            return SignalResult::Cancel;
+
+        default:
+            std::abort ();
+    }
 }
 
 bool HandleArgCountCheck (int argc)
@@ -103,9 +102,9 @@ bool HandleArgCountCheck (int argc)
 
 bool HandleNoWaitArgCheck (wchar_t* pArg)
 {
-    if (_wcsicmp (pArg, L"--nowait") != 0) {
+    if (_wcsicmp (pArg, L"--nowait") != 0 && _wcsicmp(pArg, L"--wait") != 0) {
         std::wcout << L"Invalid second argument!" << std::endl;
-        Usage();
+        Usage ();
 
         return false;
     }
@@ -113,43 +112,37 @@ bool HandleNoWaitArgCheck (wchar_t* pArg)
     return true;
 }
 
-bool GetNoWaitArgCheckValue (wchar_t* pNoWaitArg)
+bool GetNoWaitArgValue (wchar_t* pNoWaitArg)
 {
-    return _wcsicmp(pNoWaitArg, L"--nowait") == 0;
+    return _wcsicmp (pNoWaitArg, L"--nowait") == 0;
 }
 
 } // namespace
+} // namespace PTH
 
 int wmain (int argc, wchar_t* argv[], wchar_t* /*envp[]*/)
 {
     // Argument handling
-    if (!HandleArgCountCheck (argc))
+    if (!PTH::HandleArgCountCheck (argc))
         return EXIT_FAILURE;
 
-    bool waitForStartSignal = true;
+    bool waitForStartOrCancelSignal = true;
     if (argc == 3) {
-        if (!HandleNoWaitArgCheck (argv[2])) {
+        if (!PTH::HandleNoWaitArgCheck (argv[2])) {
+
             return EXIT_FAILURE;
         }
 
-        waitForStartSignal = !GetNoWaitArgCheckValue (argv[2]);
-    }
-
-    if (argc == 3) {
-        if (_wcsicmp(argv[2], L"--nowait") != 0) {
-            std::wcout << L"Invalid second argument!" << std::endl;
-            Usage();
-
-            return EXIT_FAILURE;
-        }
+        waitForStartOrCancelSignal = !PTH::GetNoWaitArgValue (argv[2]);
     }
 
     // For ignoring interruptions which etwprof handles
-    SetConsoleCtrlHandler (CtrlHandler, TRUE);
+    SetConsoleCtrlHandler (PTH::CtrlHandler, TRUE);
 
     // Wait until we are signaled to start our work (unless we are told otherwise by a command line parameter)
-    if (waitForStartSignal)
-        WaitForStartSignal ();
+    if (waitForStartOrCancelSignal)
+        if (PTH::WaitForStartOrCancelSignal () == PTH::SignalResult::Cancel)
+            return EXIT_SUCCESS;
 
     const PTH::Operation* operation = PTH::OperationRegistrar::Instance ().Find (argv[1]);
     if (operation != nullptr) {

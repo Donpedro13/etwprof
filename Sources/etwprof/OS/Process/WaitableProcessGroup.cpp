@@ -6,8 +6,6 @@ using namespace std::chrono_literals;
 #include "Utility/Asserts.hpp"
 #include "Utility/OnExit.hpp"
 
-#include "Log/Logging.hpp"   // TODO REMOVE
-
 // Currently, /analyze is not a friend of std::timed_mutex and others (I guess this is the same as:
 //   https://developercommunity.visualstudio.com/t/lock_guard-with-shared_timed_mutex-SCA-a/10370951)
 #pragma warning (disable: 26110)
@@ -99,8 +97,6 @@ bool WaitableProcessGroup::Delete (PID pid)
     m_waitContexts.erase (&process);
     m_processes.erase (pid);
 
-    Log (LogSeverity::Debug, L"WaitableProcessGroup::IsAllFinished will be called from Delete");
-
     if (IsAllFinished ())    // It's possible that we've just deleted the very last "outstanding" process
         m_allFinishedEvent.Set ();
 
@@ -153,24 +149,12 @@ bool WaitableProcessGroup::IsAllFinished ()
 {
     std::lock_guard guard (m_lock);
 
-    static int i;
-    ++i;
-
-    //Log (LogSeverity::Debug, L"WaitableProcessGroup::IsAllFinished query: conatins " + std::to_wstring (m_waitContexts.size ()) + L" " + std::to_wstring (m_processes.size ()) + L" processes");
-
     EnsureWaitingForAll ();
-
-    for (const auto& [p, _] : m_waitContexts)
-        Log (LogSeverity::Debug, std::to_wstring(i) + L" WaitableProcessGroup::IsAllFinished waitcontext: " + std::to_wstring(p->GetPID ()));
-
-    //Log(LogSeverity::Debug, L"WaitableProcessGroup::IsAllFinished query: conatins " + std::to_wstring(m_waitContexts.size()) + L" " + std::to_wstring(m_processes.size()) + L" processes");
 
     for (const auto& [_, waitContext] : m_waitContexts) {
         if (!waitContext.finished)
             return false;
     }
-
-    Log (LogSeverity::Debug, std::to_wstring(i) + L"WaitableProcessGroup::IsAllFinished will return true");
 
     return true;
 }

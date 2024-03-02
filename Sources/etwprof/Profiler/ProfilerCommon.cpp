@@ -148,17 +148,17 @@ bool FilterProcessEvent (UCHAR opcode,
 
     if (profiledProcess) {
         switch (opcode) {
-        case ETWConstants::PStartOpcode:
-            pProcessLifetimeEventSource->NotifyProcessStarted (pData->m_processID,
-                                                               pData->m_parentProcessID);
+            case ETWConstants::PStartOpcode:
+                pProcessLifetimeEventSource->NotifyProcessStarted (pData->m_processID,
+                                                                   pData->m_parentProcessID);
 
-            break;
-        case ETWConstants::PEndOpcode:
-            pProcessLifetimeEventSource->NotifyProcessEnded (pData->m_processID,
-                                                             pData->m_parentProcessID);
+                break;
+            case ETWConstants::PEndOpcode:
+                pProcessLifetimeEventSource->NotifyProcessEnded (pData->m_processID,
+                                                                 pData->m_parentProcessID);
 
-            pFilterData->targetPIDs.erase (pData->m_processID);
-            break;
+                pFilterData->targetPIDs.erase (pData->m_processID);
+                break;
         }
     }
 

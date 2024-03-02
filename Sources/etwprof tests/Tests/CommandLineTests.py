@@ -40,6 +40,8 @@ def test_profile_command():
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--nologo"])))
 
+    expect_zero(_run_command_line_test(_create_valid_profile_args(["--children"])))
+
     expect_zero(_run_command_line_test(_create_valid_profile_args(["-m"])))
     expect_zero(_run_command_line_test(_create_valid_profile_args(["-m", "--mflags=0x3456"])))
 
@@ -66,7 +68,7 @@ class _RealWorldTestsFixture:
 def test_profile_command_real_world():
     expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "-o=C:\\mytrace.etl"]))
     expect_zero(_run_command_line_test(["profile", "-t=17816", "--outdir=%TMP%", "--cswitch", "--compress=7z"]))
-    expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100"]))
+    expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100", "--children"]))
     expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
 
 @testcase(suite = _cmd_suite, name = "Argument parsing errors")

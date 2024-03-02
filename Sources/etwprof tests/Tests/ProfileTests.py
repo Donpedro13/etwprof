@@ -168,6 +168,9 @@ def _test_children_impl(count:int, cascading = False):
     filelist, processes = perform_profile_test(operation, fixture.outdir, ["--children"])
     expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1 + count}
     process_predicate = ProcessSubsetAndThenCountsPredicate(processes, expected_process_counts)
+
+    # Unfortunately, we don't do the usual ETL content check for child processes, as that would require knowing their
+    #   PIDs in advance (which we don't)
     etl_content_predicates = get_basic_etl_content_predicates (processes, custom_process_predicates=True)
     etl_content_predicates.append (process_predicate)
 
@@ -187,6 +190,73 @@ def test_child_processes_many():
 @testcase(suite = _profile_suite, name = "Child processes (cascading)", fixture = ProfileTestsFixture())
 def test_child_processes_cascading():
     _test_children_impl(5, True)
+
+def _test_children_process_tree_impl(tree_operations: Iterable[str], process_counts: dict[str, int], trace_children = True):
+    from contextlib import ExitStack
+
+    pths: List[PTHProcess] = []
+    pth_infos = []
+    for op in tree_operations:
+        pths.append(PTHProcess(op))
+        pth_infos.append(ProcessInfo(PTH_EXE_NAME, pths[-1].pid))
+
+    # When only one process tree is to be constructed (1 launched PTH process), specifying the target by PID is a
+    #   "nice touch", so child processes will be "picked up" by the child process tracing functionality, and not the
+    #   "multiple process" support that works based on process name
+    target = pths[0].pid if len(pths) == 1 else PTH_EXE_NAME
+
+    with ExitStack() as stack, EtwprofProcess(target, fixture.outdir, ["--children"] if trace_children else []) as etwprof:
+        for p in pths:
+            stack.enter_context(p)
+
+        wait_for_etwprof_session()
+
+        # Create process trees
+        pth_events = [] # We need to keep them around until all PTHs exit, to avoid race conditions
+        for p in pths:
+            pth_events.append(p.get_event_for_sync())
+            pth_events[-1].signal()
+
+        # At this point, all PTH child processes should wait for their own event and the "global cancel event" (which we
+        #   did not signal yet). Let's signal it, so all processes will exit.
+        cancel_event = get_PTH_global_cancel_event()
+        cancel_event.signal()
+
+        for p in pths:
+            p.check()
+
+        etwprof.check()
+    
+    filelist = list_files_in_dir(fixture.outdir)
+
+    process_predicate = ProcessSubsetAndThenCountsPredicate(pth_infos, process_counts)
+    etl_content_predicates = get_basic_etl_content_predicates(pth_infos, custom_process_predicates=True)
+    etl_content_predicates.append (process_predicate)
+
+    expectations = [EtlContentExpectation ("*etl", etl_content_predicates),
+                    ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE)]
+
+    evaluate_profile_test(filelist, expectations)
+
+@testcase(suite = _profile_suite, name = "Child processes (PTH process tree)", fixture = ProfileTestsFixture())
+def test_child_processes_pth_process_tree():
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 6}
+    _test_children_process_tree_impl(["CreateProcessTreeWith5PTHs"], expected_process_counts)
+
+@testcase(suite = _profile_suite, name = "Child processes (multiple PTH process trees)", fixture = ProfileTestsFixture())
+def test_child_processes_pth_multiple_process_trees():
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 12}
+    _test_children_process_tree_impl(["CreateProcessTreeWith5PTHs", "CreateProcessTreeWith5PTHs"], expected_process_counts)
+
+@testcase(suite = _profile_suite, name = "Child processes (mixed process tree)", fixture = ProfileTestsFixture())
+def test_child_processes_mixed_process_tree():
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 6, "cmd.exe" : 1, "conhost.exe" : 2}
+    _test_children_process_tree_impl(["CreateProcess5TreeMixed"], expected_process_counts)
+
+@testcase(suite = _profile_suite, name = "Child processes (no child tracing)", fixture = ProfileTestsFixture())
+def test_child_processes_no_child_tracing():
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1}
+    _test_children_process_tree_impl(["CreateProcess5TreeMixed"], expected_process_counts, trace_children=False)
 
 @testcase(suite = _profile_suite, name = "Unknown process (name)", fixture = ProfileTestsFixture())
 def test_unknown_process_name():

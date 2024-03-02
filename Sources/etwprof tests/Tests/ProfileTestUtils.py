@@ -66,6 +66,12 @@ class PTHProcess(AsyncTimeoutedProcess):
 
     def get_event_for_sync(self):
         return self._event
+    
+def get_PTH_global_cancel_event() -> Win32NamedEvent:
+    '''Gets or creates the global cancel event for PTH instances.
+       They also wait on this event when they wait on their own, per-process "sync event"'''
+
+    return Win32NamedEvent(f"PTH_event_global_cancel", create_or_open = True)
 
 class EtwprofProcess(AsyncTimeoutedProcess):
     def __init__(self, target_pid_or_name, outdir_or_file, extra_args = None):
@@ -304,9 +310,9 @@ class ProcessExactMatchPredicate(Predicate):
 
             return False
         
-# This is a weird predicate, used for testing child process debugging. First, it checks for the presence of given
+# This is a weird predicate, used for testing child process profiling. First, it checks for the presence of given
 #   processes (both name and PID, as usual), but it's not an error if additional processes exist in the trace ("subset").
-#   Then, it checks for the count of processes, stritctly by image name (we don't know the PIDs of most of child
+#   Then, it checks for the count of processes, strictly by image name (we don't know the PIDs of most of child
 #   processes in advance...)
 class ProcessSubsetAndThenCountsPredicate(Predicate):
     def __init__(self, processes: List[ProcessInfo], process_counts_by_name: Dict[str, int]):
@@ -337,8 +343,8 @@ class ProcessSubsetAndThenCountsPredicate(Predicate):
             # Finally, check if the counts match
             if actual_process_counts[p] != c:
                 self._explanation = f"""The process count for {p} is not equal with the count in the trace data.
-                \tExpected: {actual_process_counts[p]}
-                \tActual: {c}"""
+                \tExpected: {c}
+                \tActual: {actual_process_counts[p]}"""
 
                 return False
 
@@ -726,12 +732,12 @@ def get_basic_predicates_for_unknown_process()-> List[Predicate]:
     return [ImageSubsetPredicate(unknown_process, driver_images), ProcessLifetimePredicate(unknown_process, PROCESS_LIFETIME_UNKNOWN)]
 
 def get_basic_etl_content_predicates(target_processes: Iterable[ProcessInfo],
-                                      thread_count_min: int = 1,
-                                      sampled_profile_min: int = 1,
-                                      additional_predicates: Optional[List[Predicate]] = None,
-                                      stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None,
-                                      process_lifetime_matcher: ProcessLifetimeMatcher = PROCESS_LIFETIME_EXITED_W_ZERO,
-                                      custom_process_predicates: bool = False):
+                                     thread_count_min: int = 1,
+                                     sampled_profile_min: int = 1,
+                                     additional_predicates: Optional[List[Predicate]] = None,
+                                     stack_count_predicate: Optional[StackCountByProviderAndEventIdGTEPredicate] = None,
+                                     process_lifetime_matcher: ProcessLifetimeMatcher = PROCESS_LIFETIME_EXITED_W_ZERO,
+                                     custom_process_predicates: bool = False):
     '''Returns a list of predicates that most ETL content checks need. Default parameters are "empiric",
     good enough values for checking most cases'''
     predicates = []
