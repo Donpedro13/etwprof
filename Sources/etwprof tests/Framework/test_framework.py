@@ -202,7 +202,10 @@ class TestRunner:
                 self.on_case_start(case)
                 try:
                     case.invoke()
-                    assert (not case.has_failures())
+                    
+                    if case.has_failures():
+                        self._failed_cases.append(case)
+
                     self.on_case_end(case)
                 except AssertionFailedError as e:
                     case.add_failure(e.failure)
