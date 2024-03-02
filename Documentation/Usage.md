@@ -8,7 +8,7 @@ etwprof
 
   Usage:
     etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
-    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
+    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
 
   Options:
@@ -57,7 +57,7 @@ Turns on ETW's stack caching feature. Using this option might reduce the result 
 * `--cswitch`  
 Does not work reliably (see [Limitations and known issues](./Limitations_known_issues.md) for details).
 * `--emulate`  
-Debugging feature. You can feed an already existing `.etl` file to etwprof with this, it will be filtered the same way as a real-time kernel session. Useful for reproducing bugs. Works with [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) traces only.
+Debugging feature. You can feed an already existing `.etl` file to etwprof with this, it will be filtered the same way as a real-time ETW session. Useful for reproducing bugs. Works with [xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) traces only.
 
 Examples
 ----------
