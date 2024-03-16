@@ -56,7 +56,7 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     // Open HANDLEs to the target processes, so we can wait for them
     for (auto pid : targetPIDs) {
         try {
-            ProcessRef target (pid, ProcessRef::Synchronize);
+            ProcessRef target (pid, ProcessRef::AccessOptions::Synchronize);
             m_targets.Add (std::move (target));
         } catch (ProcessRef::InitException& e) {            
             throw InitException (L"Unable to open HANDLE for target process with pid " +
@@ -257,7 +257,7 @@ unsigned int ETWProfiler::ProfileHelper (void* instance)
 void ETWProfiler::ProcessStarted (PID pid, PID /*parentPID*/)
 {
     try {
-        ProcessRef target (pid, ProcessRef::Synchronize);
+        ProcessRef target (pid, ProcessRef::AccessOptions::Synchronize);
         m_targets.Add (std::move (target));
     } catch (const ProcessRef::InitException&) {
         ETWP_DEBUG_BREAK ();

@@ -8,18 +8,29 @@
 #include "OS/Utility/OSTypes.hpp"
 
 #include "Utility/Exception.hpp"
+#include "Utility/EnumFlags.hpp"
+#include "Utility/Result.hpp"
 
 namespace ETWP {
 
 // Class for wrapping an already existing, OS-native process. The process HANDLE is kept open until the object exists.
 class ProcessRef final {
 public:
-    using Options = uint16_t;
-    enum : Options {
-        Default     = 0,
+    enum class AccessOptions {
+        Default = 0,
         Synchronize = 0b01,
-        ReadMemory  = 0b10,
+        ReadMemory = 0b10,
     };
+
+    ETWP_ENUM_FLAG_SUPPORT_CLASS(AccessOptions);
+
+    enum class CreateOptions {
+        Default    = 0,
+        NoOutput   = 0b01,
+        NewConsole = 0b10,
+    };
+
+    ETWP_ENUM_FLAG_SUPPORT_CLASS(CreateOptions);
 
     class InitException : public Exception {
     public:
@@ -27,7 +38,12 @@ public:
         virtual ~InitException () = default;
     };
 
-    ProcessRef (PID pid, Options options);
+    static Result<ProcessRef> StartProcess (const std::wstring& processPath,
+                                            const std::wstring& args,
+                                            AccessOptions accessOptions = AccessOptions::Default,
+                                            CreateOptions createOptions = CreateOptions::Default);
+
+    ProcessRef (PID pid, AccessOptions options);
     ProcessRef (ProcessRef&&);
     ~ProcessRef();
 
@@ -42,8 +58,8 @@ public:
     PID          GetPID () const;
     std::wstring GetName () const;
 
-    HANDLE  GetHandle () const;
-    Options GetOptions () const;
+    HANDLE        GetHandle () const;
+    AccessOptions GetOptions () const;
 
 private:
     PID    m_pid;
@@ -51,7 +67,7 @@ private:
 
     std::wstring m_imageName;
 
-    Options m_options;
+    AccessOptions m_options;
 };
 
 }   // namespace ETWP

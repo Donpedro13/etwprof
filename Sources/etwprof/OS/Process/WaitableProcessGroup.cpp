@@ -47,7 +47,7 @@ WaitableProcessGroup::ConstIterator::~ConstIterator ()
 WaitableProcessGroup::WaitableProcessGroup (std::vector<ProcessRef>&& processes)
 {
     for (auto&& process : processes) {
-        ETWP_ASSERT (process.GetOptions () & ProcessRef::Synchronize);
+        ETWP_ASSERT (IsFlagSet (process.GetOptions (), ProcessRef::AccessOptions::Synchronize));
 
         Add (std::move (process));
     }
@@ -236,7 +236,7 @@ void WaitableProcessGroup::CancelWait (ProcessWaitContext* pWaitContext, bool wa
 
 void WaitableProcessGroup::AddImpl (ProcessRef&& process)
 {
-    ETWP_ASSERT (process.GetOptions () & ProcessRef::Synchronize);
+    ETWP_ASSERT (IsFlagSet (process.GetOptions (), ProcessRef::AccessOptions::Synchronize));
 
     const PID pid = process.GetPID ();
     const HANDLE handle = process.GetHandle ();

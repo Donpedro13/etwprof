@@ -525,15 +525,21 @@ bool Application::DoProfile ()
                 
                 COut () << ColorReset << L"Launching 7zr for compression..." << Endl;
 
-                DWORD status;
-                if (ETWP_ERROR (!CreateProcessSynchronousNoOutput (sevenZipPath, commandLine, &status))) {
-                    Log (LogSeverity::Error, L"Unable to start 7z for compression!");
+                Result<ProcessRef> zipResult = ProcessRef::StartProcess (sevenZipPath,
+                                                                         commandLine,
+                                                                         ProcessRef::AccessOptions::Synchronize,
+                                                                         ProcessRef::CreateOptions::NoOutput);
+                if (ETWP_ERROR (!zipResult.has_value ())) {
+                    Log (LogSeverity::Error, L"Unable to start 7z for compression (" + zipResult.error () + L")!");
 
                     return false;
                 }
 
-                if (ETWP_ERROR (status != 0)) {
-                    Log (LogSeverity::Error, L"7z returned error while compressing trace!");
+                zipResult->Wait ();
+                
+                if (ETWP_ERROR (zipResult->GetExitCode () != 0)) {
+                    Log (LogSeverity::Error, L"7z returned error while compressing trace (" +
+                        std::to_wstring (zipResult->GetExitCode ()) + L")!");
 
                     return false;
                 }
@@ -558,7 +564,7 @@ Result<std::unique_ptr<WaitableProcessGroup>> Application::GetTargets () const
 {
     auto result = std::make_unique<WaitableProcessGroup> ();
     try {
-        const ProcessRef::Options processOptions = ProcessRef::Synchronize | ProcessRef::ReadMemory;
+        const ProcessRef::AccessOptions processOptions = ProcessRef::AccessOptions::Synchronize | ProcessRef::AccessOptions::ReadMemory;
         const ProcessList processList;
 
         if (m_args.targetIsPID) {

@@ -96,6 +96,7 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Asserts.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Exception.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/Utility/EnumFlags.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/GUID.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/GUID.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/Utility/Macros.hpp
