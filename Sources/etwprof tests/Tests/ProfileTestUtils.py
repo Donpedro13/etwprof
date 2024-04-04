@@ -29,6 +29,9 @@ def generate_ctrl_c_for_children():
     # Restore the previous (most likely the default) handler
     signal.signal(signal.SIGINT, previous_handler)
 
+def get_pth_path() -> str:
+    return os.path.join(TestConfig._testbin_folder_path, PTH_EXE_NAME)
+
 class ProfileTestsFixture(ETWProfFixture):
     def setup(self):
         super().setup()
@@ -53,7 +56,7 @@ class PTHProcess(AsyncTimeoutedProcess):
     def __init__(self, operation: Optional[str] = None):
 
 
-        super().__init__(os.path.join(TestConfig._testbin_folder_path, PTH_EXE_NAME),
+        super().__init__(get_pth_path(),
                          [operation if operation else "DoNothing"],
                          timeout = TestConfig.get_process_timeout())
 
@@ -74,7 +77,13 @@ def get_PTH_global_cancel_event() -> Win32NamedEvent:
     return Win32NamedEvent(f"PTH_event_global_cancel", create_or_open = True)
 
 class EtwprofProcess(AsyncTimeoutedProcess):
-    def __init__(self, target_pid_or_name, outdir_or_file, extra_args = None):
+    def __init__(self, args: Iterable[str]):
+        super().__init__(os.path.join(TestConfig._testbin_folder_path, "etwprof.exe"),
+                         args,
+                         timeout = TestConfig.get_process_timeout())
+        
+    @classmethod
+    def attach_to_profilee(cls, target_pid_or_name, outdir_or_file, extra_args = None):
         if not extra_args:
             extra_args = []
 
@@ -86,9 +95,30 @@ class EtwprofProcess(AsyncTimeoutedProcess):
 
         profile_args.extend(extra_args)
 
-        super().__init__(os.path.join(TestConfig._testbin_folder_path, "etwprof.exe"),
-                         profile_args,
-                         timeout = TestConfig.get_process_timeout())
+        return cls(profile_args)
+        
+    @classmethod
+    def start_profilee(cls, outdir_or_file: str, exe_path:str, exe_args: Optional[Iterable[str]] = None, extra_args = None):
+        if not extra_args:
+            extra_args = []
+
+        if not exe_args:
+            exe_args = []
+
+        profile_args = ["profile"]
+        if os.path.isdir(outdir_or_file):
+            profile_args.append(f"--outdir={outdir_or_file}")
+        else:
+            profile_args.append(f"-o={outdir_or_file}")
+
+        profile_args.extend(extra_args)
+        profile_args.append("--")
+        profile_args.append(exe_path)
+        profile_args.extend(exe_args)
+
+        return cls(profile_args)
+
+        
 
 def list_files_in_dir(dir) -> List[str]:
     return [os.path.join(dir, f) for f in os.listdir(dir)]
@@ -249,7 +279,7 @@ def perform_profile_test(operation, outdir_or_file, extra_args = None, options =
     with PTHProcess(operation) as pth, pth.get_event_for_sync() as e:
         processinfo = ProcessInfo(PTH_EXE_NAME, pth.pid)
         # Start etwprof, and make it attach to the target process
-        with EtwprofProcess(PTH_EXE_NAME if options & ProfileTestOptions.TARGET_ID_NAME else pth.pid,
+        with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME if options & ProfileTestOptions.TARGET_ID_NAME else pth.pid,
                             outdir_or_file, extra_args) as etwprof:
 
             wait_for_etwprof_session()

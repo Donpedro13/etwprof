@@ -37,7 +37,7 @@ public:
 
     virtual bool EnableProvider (const ProviderInfo& providerInfo) = 0;
 
-    virtual uint16_t GetNumberOfProfiledProcesses () = 0;
+    virtual uint32_t GetNumberOfProfiledProcesses () = 0;
 };
 
 bool operator== (const IETWBasedProfiler::ProviderInfo& lhs, const IETWBasedProfiler::ProviderInfo& rhs);

@@ -12,7 +12,10 @@ def _create_valid_profile_args(args):
     return result
 
 def _run_command_line_test(args):
-    args.append("--noaction")   # Makes etwprof handle arguments, then exit instead of taking any action
+    # Makes etwprof handle arguments, then exit instead of taking any action. We insert this as the second argument, as:
+    # - the first argument might be a (positional) argument, specifying a command
+    # - the last group of arguments might be specifying a full command line of a new process to be started
+    args.insert(1, "--noaction")
     return run_etwprof(args)
 
 @testcase(suite = _cmd_suite, name = "No args")
@@ -37,6 +40,7 @@ def test_profile_command():
     expect_zero(_run_command_line_test(["profile", "-t=123456", "-o=C:\\whatever.etl"]))
     expect_zero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=C:\\"]))
     expect_zero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=%TMP%"]))
+    expect_zero(_run_command_line_test(["profile", "--outdir=D:\\", "--", get_cmd_path(), "--arg1=a", "--test", "--", "-a"]))
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--nologo"])))
 
@@ -67,6 +71,7 @@ class _RealWorldTestsFixture:
 @testcase(suite = _cmd_suite, name = "Profile command real-world", fixture = _RealWorldTestsFixture())
 def test_profile_command_real_world():
     expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "-o=C:\\mytrace.etl"]))
+    expect_zero(_run_command_line_test(["profile", "--outdir=D:\\", "--", get_cmd_path(), "/C", "exit"]))
     expect_zero(_run_command_line_test(["profile", "-t=17816", "--outdir=%TMP%", "--cswitch", "--compress=7z"]))
     expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100", "--children"]))
     expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
@@ -89,6 +94,10 @@ def test_profile_erroneous():
     expect_nonzero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=C:\\this_folder_does_not_exist"]))
     expect_nonzero(_run_command_line_test(["profile", "-t=123", "-o=C:\\test.etlbadextenstion"]))
     expect_nonzero(_run_command_line_test(["profile", "-t=123", "--compress=7z", "-o=C:\\test.etl"]))   # etl instead of 7z as extension
+    expect_nonzero(_run_command_line_test(["profile", "-t=123", "--outdir=D:\\", "--", get_cmd_path()])) # Both a target is specified, and an executable is provided to be launched
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "-m", "--", get_cmd_path()])) # Minidump requested, even though the profiled process is to be launched
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "-m", "--", "DoesNotExist.exe"])) # Process to be launched does not exist
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "--"])) # Process to be launched is not specified
 
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--mflags=0"])))   # w/o -m
 
@@ -147,6 +156,8 @@ def test_emulate_mode():
     expect_nonzero(_run_command_line_test(["profile", r"--emulate=C:\does_not_exist.etl", "-t=123", r"-o=%TMP%\ot.etl"]))
     # Target is specified by exe name, should be PID
     expect_nonzero(_run_command_line_test(["profile", f"--emulate={fixture.etl}", "-t=notepad.exe", r"-o=%TMP%\ot.etl"]))
+    # A minidump is requested
+    expect_nonzero(_run_command_line_test(["profile", f"--emulate={fixture.etl}", "-t=notepad.exe", "-m", r"-o=%TMP%\ot.etl"]))
     
     expect_zero(_run_command_line_test(["profile", f"--emulate={fixture.etl}", "-t=123456", r"-o=%TMP%\o.etl"]))
 

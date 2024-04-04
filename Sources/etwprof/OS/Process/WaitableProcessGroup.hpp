@@ -17,7 +17,7 @@ namespace Impl { struct WaitCallbackContext; }
 class WaitableProcessGroup final {
 public:
     using ProcessesByPIDMap = std::unordered_map<PID, ProcessRef>;
-    using Size = uint16_t;   // DWORD, used of PIDs on Windows
+    using Size = PID;
 
     class ConstIterator {    // Needed for atomic iteration
     public:

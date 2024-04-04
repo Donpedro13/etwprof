@@ -32,7 +32,7 @@
 namespace ETWP {
 
 ETWProfiler::ETWProfiler (const std::wstring& outputPath,
-                          const std::vector<DWORD>& targetPIDs,
+                          const std::vector<PID>& targetPIDs,
                           const ProfileRate& samplingRate,
                           IETWBasedProfiler::Flags options):
     m_lock (),
@@ -238,7 +238,7 @@ bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& provide
     return true;
 }
 
-uint16_t ETWProfiler::GetNumberOfProfiledProcesses ()
+uint32_t ETWProfiler::GetNumberOfProfiledProcesses ()
 {
     return m_targets.GetWaitingSize (); // m_targets has its own lock
 }

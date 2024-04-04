@@ -8,6 +8,7 @@ etwprof
 
   Usage:
     etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
+    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children] -- <process_path> [<process_args>...]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
 
@@ -63,7 +64,9 @@ Examples
 ----------
 
 * `etwprof profile -t=notepad.exe -o=D:\temp\mytrace.etl`
-Profiles all notepad.exe processes, writes result to the specified etl file.
+Profiles all running notepad.exe processes, writes result to the specified etl file.
+* `etwprof profile --outdir=D:\ -- C:\Windows\System32\cmd.exe /C exit`
+Starts cmd.exe with the specified command line arguments, and profiles it
 * `etwprof profile -t=17816 --outdir=%TMP% --cswitch --compress=7z`
 Profiles process with PID 17816, writes result to the temporary directory, collects context switch events, utilizes 7-zip compression.
 * `etwprof profile -v --nologo -t=notepad.exe --outdir=D:\temp -m --rate=100 --children`

@@ -28,6 +28,6 @@ static_assert (std::is_scoped_enum<T>::value, "Flag support can only be enabled 
 [[maybe_unused]] friend constexpr inline T& operator^= (T& l, T r) { l = l ^ r; return l; }                                                            \
 
 template<typename T>
-inline bool IsFlagSet (T v, T f) { return std::underlying_type<T>::type(v) | std::underlying_type<T>::type(f); }
+inline bool IsFlagSet (T v, T f) { return std::underlying_type<T>::type(v) & std::underlying_type<T>::type(f); }
 
 #endif  // #ifndef ETWP_ENUM_FLAGS_HPP

@@ -69,7 +69,7 @@ def test_multiple_target_processes_few_w_dumps():
     N_PROCESSES = 5
     pths = launch_pth_processes(N_PROCESSES)
 
-    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile, ["-m"]) as etwprof:
+    with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile, ["-m"]) as etwprof:
         wait_for_etwprof_session()
 
         for event in pths.values():
@@ -98,7 +98,7 @@ def test_multiple_target_processes_many():
     N_PROCESSES = 128
     pths = launch_pth_processes(N_PROCESSES)
 
-    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+    with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof:
         wait_for_etwprof_session()
 
         for event in pths.values():
@@ -129,7 +129,7 @@ def test_multiple_target_processes_many_various_ops():
     pths_all_processes = lambda : chain(pths_do_nothing, pths_5_sec_cpu_burn, pths_wait_1_sec, pths_wait_5_sec)
     pths_all_events = lambda : chain(pths_do_nothing.values(), pths_5_sec_cpu_burn.values(), pths_wait_1_sec.values(), pths_wait_5_sec.values())
 
-    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+    with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof:
         wait_for_etwprof_session()
 
         for event in pths_all_events():
@@ -205,7 +205,7 @@ def _test_children_process_tree_impl(tree_operations: Iterable[str], process_cou
     #   "multiple process" support that works based on process name
     target = pths[0].pid if len(pths) == 1 else PTH_EXE_NAME
 
-    with ExitStack() as stack, EtwprofProcess(target, fixture.outdir, ["--children"] if trace_children else []) as etwprof:
+    with ExitStack() as stack, EtwprofProcess.attach_to_profilee(target, fixture.outdir, ["--children"] if trace_children else []) as etwprof:
         for p in pths:
             stack.enter_context(p)
 
@@ -258,9 +258,62 @@ def test_child_processes_no_child_tracing():
     expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1}
     _test_children_process_tree_impl(["CreateProcess5TreeMixed"], expected_process_counts, trace_children=False)
 
+def _test_profile_start_process_impl(process_path: str, args: Iterable[str], outdir_or_file: str, process_counts: dict[str, int], etwprof_extra_args: Optional[Iterable[str]] = None):
+    with EtwprofProcess.start_profilee(outdir_or_file, process_path, args, etwprof_extra_args) as etwprof:
+        etwprof.check()
+    
+    filelist = list_files_in_dir(fixture.outdir)
+
+    process_predicate = ProcessSubsetAndThenCountsPredicate([], process_counts)
+    etl_content_predicates = get_basic_etl_content_predicates([], custom_process_predicates=True)
+    etl_content_predicates.append (process_predicate)
+
+    expectations = [EtlContentExpectation ("*etl", etl_content_predicates),
+                    ProfileTestFileExpectation("*.etl", 1, ETL_MIN_SIZE)]
+
+    evaluate_profile_test(filelist, expectations)
+
+@testcase(suite = _profile_suite, name = "Profilee started (no args)", fixture = ProfileTestsFixture())
+def test_profilee_started_no_args():
+    expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1}
+    _test_profile_start_process_impl(get_pth_path(), [], fixture.outfile, expected_process_counts)
+
+@testcase(suite = _profile_suite, name = "Profilee started (multiple args)", fixture = ProfileTestsFixture())
+def test_profilee_started_multiple_args():
+    expected_process_counts = { unknown_process.image_name : 1, "cmd.exe": 1}
+    _test_profile_start_process_impl(get_cmd_path(), ["/C", "exit"], fixture.outfile, expected_process_counts)
+
+@testcase(suite = _profile_suite, name = "Profilee started (w/ child processes)", fixture = ProfileTestsFixture())
+def test_profilee_started_w_child_processes():
+    expected_process_counts = { unknown_process.image_name : 1, "cmd.exe": 2, "conhost.exe": 1}
+    _test_profile_start_process_impl(get_cmd_path(), ["/C", "cmd", "/C", "exit"], fixture.outfile, expected_process_counts, ["--children"])
+
+@testcase(suite = _profile_suite, name = "Profilee started (arg with space)", fixture = ProfileTestsFixture())
+def test_profilee_started_arg_with_space():
+    """This test case is tricky: we echo a string with cmd containing spaces. The output is piped into find.exe which
+       looks for spaces. If it finds one, another cmd.exe instance is launched."""
+    
+
+    expected_process_counts = { unknown_process.image_name : 1,
+                               "cmd.exe" : 3,   # It's 3 because piping seems to make the echo command run in its own cmd instance
+                               "conhost.exe" : 1,
+                               "find.exe" : 1}
+    _test_profile_start_process_impl(get_cmd_path(),
+                                     ["/C echo \"Cheeky & exit\"| find \" \" >nul & if errorlevel 1 (echo No space found) else (cmd /C exit)"],
+                                     fixture.outfile,
+                                     expected_process_counts,
+                                     ["--children"])
+    
+@testcase(suite = _profile_suite, name = "Profilee started (parse error)", fixture = ProfileTestsFixture())
+def test_profilee_started_parse_error():
+    with EtwprofProcess(["profile", '-o="%TMP%\\out -- file.etl"', f"-- {get_cmd_path()} /C exit"]) as etwprof:
+        etwprof.wait()
+
+        assert_neq(etwprof.exitcode, 0)
+
 @testcase(suite = _profile_suite, name = "Unknown process (name)", fixture = ProfileTestsFixture())
 def test_unknown_process_name():
-    with EtwprofProcess("ThisSurelyDoesNotExist.exe", fixture.outfile) as etwprof:
+    with EtwprofProcess.attach_to_profilee("ThisSurelyDoesNotExist.exe", fixture.outfile) as etwprof:
         etwprof.wait()
 
         assert_neq(etwprof.exitcode, 0)
@@ -268,7 +321,7 @@ def test_unknown_process_name():
 @testcase(suite = _profile_suite, name = "Unknown process (PID)", fixture = ProfileTestsFixture())
 def test_unknown_process_pid():
     PID_MAX = 0xFFFFFFFF
-    with EtwprofProcess(PID_MAX, fixture.outfile) as etwprof:
+    with EtwprofProcess.attach_to_profilee(PID_MAX, fixture.outfile) as etwprof:
         etwprof.wait()
 
         assert_neq(etwprof.exitcode, 0)
@@ -282,7 +335,7 @@ def test_debug_mode():
     
 @testcase(suite = _profile_suite, name = "Profiling stopped with CTRL+C", fixture = ProfileTestsFixture())
 def test_ctrl_c_stop():
-    with PTHProcess() as pth, pth.get_event_for_sync() as e, EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+    with PTHProcess() as pth, pth.get_event_for_sync() as e, EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof:
         wait_for_etwprof_session()
 
         # Stop etwprof by "pressing" CTRL+C
@@ -311,7 +364,7 @@ def test_ctrl_c_stop():
 @testcase(suite = _profile_suite, name = "ETW session killed", fixture = ProfileTestsFixture())
 def test_etw_session_killed():
     # Start PTH (since we never signal its event, it will wait forever), then we pull the rug from under etwprof
-    with PTHProcess() as pth, EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+    with PTHProcess() as pth, EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof:
         # It's possible that we will try to stop etwprof's session *before* it even started, so let's retry a few
         # times, if that happens
         for i in range(0, 3):
@@ -326,7 +379,7 @@ def test_etw_session_killed():
 def test_emulate_mode():
     # TODO: modify this test case, so actual filtering is tested
     # Create an ETL file that will serve as an input for testing emulate mode
-    with PTHProcess() as pth, pth.get_event_for_sync() as e, EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof:
+    with PTHProcess() as pth, pth.get_event_for_sync() as e, EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof:
         target_pid = pth.pid
 
         wait_for_etwprof_session()
@@ -339,7 +392,7 @@ def test_emulate_mode():
     os.rename(fixture.outfile, emulate_input_etl)
     assert_false(os.path.exists(fixture.outfile))   # Check if the rename succeeded
 
-    with EtwprofProcess(target_pid, fixture.outfile, [f"--emulate={emulate_input_etl}"]) as etwprof:
+    with EtwprofProcess.attach_to_profilee(target_pid, fixture.outfile, [f"--emulate={emulate_input_etl}"]) as etwprof:
         etwprof.check()
 
     evaluate_simple_profile_test([fixture.outfile], fixture.outfile, [ProcessInfo(PTH_EXE_NAME, target_pid)])
@@ -391,8 +444,8 @@ def test_multiple_etwprofs_at_once():
 
     with PTHProcess() as pth,    \
          pth.get_event_for_sync() as e,          \
-         EtwprofProcess(PTH_EXE_NAME, fixture.outfile) as etwprof1, \
-         EtwprofProcess(PTH_EXE_NAME, fixture.outdir) as etwprof2:
+         EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof1, \
+         EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outdir) as etwprof2:
             wait_for_etwprof_session()
             e.signal()
 
@@ -677,7 +730,7 @@ def test_user_providers_multiple_processes():
 
     pths = launch_pth_processes(3, "MBTLEmitAll")
 
-    with EtwprofProcess(PTH_EXE_NAME, fixture.outfile, [get_enable_string_for_all_providers()]) as etwprof:
+    with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile, [get_enable_string_for_all_providers()]) as etwprof:
         wait_for_etwprof_session()
 
         for event in pths.values():

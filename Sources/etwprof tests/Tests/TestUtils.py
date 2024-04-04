@@ -231,3 +231,6 @@ class ETWProfFixture:
         stopped_sessions = stop_etwprof_sessions_if_any()
         if stopped_sessions:
             test_framework.fail (f'Testcase leaked the following ETW session(s): {", ".join(stopped_sessions)}')
+
+def get_cmd_path() -> str:
+    return r"C:\Windows\System32\cmd.exe"

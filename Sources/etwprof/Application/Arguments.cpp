@@ -1,6 +1,6 @@
 #include "Arguments.hpp"
 
-#include "Application.hpp"
+#include <regex>
 
 #include "Log/Logging.hpp"
 
@@ -391,10 +391,56 @@ bool SemaOutputPath (const ApplicationRawArguments& parsedArgs, ApplicationArgum
 
 bool SemaTarget (const ApplicationRawArguments& parsedArgs, ApplicationArguments* pArgumentsOut)
 {
-    if (!parsedArgs.target) {
-        LogFailedSema (L"Target parameter is mandatory for profiling!");
+    if (parsedArgs.startCommandLine && parsedArgs.target) {
+        LogFailedSema (L"An existing process to profile and a process to be started cannot be both specified at the same time!");
 
         return false;
+    } else if (!parsedArgs.startCommandLine && !parsedArgs.target) {
+        LogFailedSema (L"Either an existing process or a process to be started must be specified to profile!");
+
+        return false;
+    }
+
+    pArgumentsOut->targetMode = parsedArgs.target ?
+        ApplicationArguments::TargetMode::Attach : ApplicationArguments::TargetMode::Start;
+
+    if (pArgumentsOut->targetMode == ApplicationArguments::TargetMode::Start) {
+        if (parsedArgs.emulate) {
+            LogFailedSema (L"In emulate mode, a process to be started cannot be specified!");
+
+            return false;
+        }
+
+        if (parsedArgs.startCommandLineValue.size () == 0) {
+            LogFailedSema (L"No command line specified for the process to be started and profiled!");
+
+            return false;
+        }
+
+        // Separate process path and arguments from command line
+        pArgumentsOut->processToStartCommandLine = parsedArgs.startCommandLineValue;
+        int argc = 0;
+        LPWSTR* pArgv = CommandLineToArgvW (parsedArgs.startCommandLineValue.c_str (), &argc);
+
+        ETWP_ASSERT (argc >= 1);
+
+        const std::wstring& processPath = pArgv[0];
+
+        LocalFree (pArgv);
+        
+        if (!PathExists (processPath)) {
+            LogFailedSema (L"Specified process to be started (" + processPath + L") does not exist!");
+
+            return false;
+        }
+
+        if (IsDirectory (processPath)) {
+            LogFailedSema(L"Specified process to be started (" + processPath + L") is a directory!");
+
+            return false;
+        }
+
+        return true;
     }
 
     // Find out whether the input'd target is a PID or an exe name
@@ -403,7 +449,7 @@ bool SemaTarget (const ApplicationRawArguments& parsedArgs, ApplicationArguments
     if (result == 0) {
         // In case of emulate mode, only PID targeting is valid
         if (parsedArgs.emulate) {
-            LogFailedSema (L"Target parameter must be PID if using \"emulate mode\"!");
+            LogFailedSema (L"Target parameter must be PID if using emulate mode!");
 
             return false;
         }
@@ -509,6 +555,12 @@ bool SemaMinidump (const ApplicationRawArguments& parsedArgs, ApplicationArgumen
 
             return false;
         }
+    }
+
+    if (parsedArgs.minidump && pArgumentsOut->targetMode == ApplicationArguments::TargetMode::Start) {
+        LogFailedSema (L"Minidump parameter is invalid when a process is to be started for profiling!");
+
+        return false;
     }
 
     if (!parsedArgs.minidump && parsedArgs.minidumpFlags) {
@@ -835,7 +887,7 @@ bool UnpackRespFiles (const std::vector<std::wstring>& arguments, std::vector<st
 
 }   // namespace
 
-bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawArguments* pArgumentsOut)
+bool ParseArguments (const std::vector<std::wstring>& arguments, const std::wstring& commandLine, ApplicationRawArguments* pArgumentsOut)
 {
     ETWP_ASSERT (pArgumentsOut != nullptr);
 
@@ -873,8 +925,16 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
     }
 
     // Parse arguments
+    bool hasDashDash = false;   // After --, the command line of a process to be started is be specified
     for (;it != finalArguments.cend (); ++it) {
         Log (LogSeverity::Debug, L"Parsing argument: " + *it);
+
+        if (*it == L"--") {
+            hasDashDash = true;
+            pArgumentsOut->startCommandLine = true;
+
+            break;
+        }
 
         if (*it == L"-") {
             LogFailedParse(L"\"-\" is not a valid argument!", *it);
@@ -894,6 +954,37 @@ bool ParseArguments (const std::vector<std::wstring>& arguments, ApplicationRawA
         } else {
             if (!ParseLongArg (*it, pArgumentsOut))
                 return false;
+        }
+    }
+
+    if (hasDashDash) {
+        // If we had --, it means that we have a process with a full command line to be started.
+
+        //  QUIRK: We need to get the string after --, and get a copy of that part, *verbatim*.
+        //  Getting the part after -- is far from trivial, as there are many edge cases. So we use a trivial regex
+        //  here, which works for 99% of the cases. Our other option would be to reimplement the quite elaborate and
+        //  mostly undocumented parsing logic employed by CommandLineToArgv.
+
+        // Look for --, surrounded by whitespace
+        // Cases where this does *not* work correctly:
+        //  - "D:\test -- folder\etwprof.exe" profile -o=D:\out.etl -- "test.exe"
+        //      - The -- in etwprof's path will be "picked up"
+        //  - "D:\\etwprof.exe" profile "-o=D:\test -- folder\out.etl" -- "test.exe"
+        //      - The -- in the output path will be "picked up"
+        const std::wregex regex (L"^.*?\\s+(--)\\s+(.*)");
+        std::wsmatch match;
+        if (std::regex_match (commandLine, match, regex)) {
+            if (match.size() != 3) {
+                LogFailedParse (L"Unable to parse command line of the process to be started!", L"");
+
+                return false;
+            }
+                
+            pArgumentsOut->startCommandLineValue = match[2].str ();
+        } else {
+            LogFailedParse (L"Unable to parse command line of the process to be started!", L"");
+
+            return false;
         }
     }
 
@@ -953,6 +1044,12 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     } else {    // Not profiling
         if (parsedArgs.target) {
             LogFailedSema (L"Target parameter is only valid for profiling!");
+
+            return false;
+        }
+
+        if (!parsedArgs.startCommandLineValue.empty ()) {
+            LogFailedSema (L"Process command line is only valid for profiling!");
 
             return false;
         }

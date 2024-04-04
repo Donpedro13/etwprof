@@ -36,7 +36,7 @@ public:
     //   Error          ->  Profiling stopped because of an error
 
     ETWProfiler (const std::wstring& outputPath,
-                 const std::vector<DWORD>& targetPIDs,
+                 const std::vector<PID>& targetPIDs,
                  const ProfileRate& samplingRate,
                  IETWBasedProfiler::Flags options);
     virtual ~ETWProfiler () override;
@@ -49,7 +49,7 @@ public:
 
     virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
 
-    virtual uint16_t GetNumberOfProfiledProcesses () override;
+    virtual uint32_t GetNumberOfProfiledProcesses () override;
 
 private:
     using ProviderInfos = std::vector<IETWBasedProfiler::ProviderInfo>;

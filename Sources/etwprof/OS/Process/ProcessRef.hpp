@@ -13,13 +13,21 @@
 
 namespace ETWP {
 
+struct ProcessInfo {
+    PID          pid;
+    std::wstring imageName;
+};
+
 // Class for wrapping an already existing, OS-native process. The process HANDLE is kept open until the object exists.
 class ProcessRef final {
 public:
+    friend class SuspendedProcessRef;
+
     enum class AccessOptions {
-        Default = 0,
-        Synchronize = 0b01,
-        ReadMemory = 0b10,
+        Default     = 0,
+        Synchronize = 0b001,
+        ReadMemory  = 0b010,
+        Terminate   = 0b100
     };
 
     ETWP_ENUM_FLAG_SUPPORT_CLASS(AccessOptions);
@@ -43,15 +51,30 @@ public:
                                             AccessOptions accessOptions = AccessOptions::Default,
                                             CreateOptions createOptions = CreateOptions::Default);
 
+    static Result<ProcessRef> StartProcess (const std::wstring& commandLine,
+                                            AccessOptions accessOptions = AccessOptions::Default,
+                                            CreateOptions createOptions = CreateOptions::Default);
+
+    static Result<SuspendedProcessRef> StartProcessSuspended (const std::wstring& processPath,
+                                                              const std::wstring& args,
+                                                              AccessOptions accessOptions = AccessOptions::Default,
+                                                              CreateOptions createOptions = CreateOptions::Default);
+
+    static Result<SuspendedProcessRef> StartProcessSuspended (const std::wstring& commandLine,
+                                                              AccessOptions accessOptions = AccessOptions::Default,
+                                                              CreateOptions createOptions = CreateOptions::Default);
+
     ProcessRef (PID pid, AccessOptions options);
     ProcessRef (ProcessRef&&);
-    ~ProcessRef();
+    ~ProcessRef ();
 
     ProcessRef (const ProcessRef&) = delete;
     const ProcessRef& operator= (const ProcessRef&) = delete;
 
     bool Wait (uint32_t timeout = INFINITE) const;
     bool HasFinished () const;
+
+    bool Terminate (uint32_t exitCode) const;
 
     DWORD GetExitCode () const;
 
@@ -62,12 +85,34 @@ public:
     AccessOptions GetOptions () const;
 
 private:
-    PID    m_pid;
+    ProcessRef (HANDLE hProcess, AccessOptions accessOptions);
+
+    ProcessInfo m_info;
+
     HANDLE m_handle;
 
-    std::wstring m_imageName;
-
     AccessOptions m_options;
+};
+
+class SuspendedProcessRef final {
+public:
+    friend class ProcessRef;
+
+    static ProcessRef Resume (SuspendedProcessRef&& suspendedProcessRef);
+
+    SuspendedProcessRef (SuspendedProcessRef&& other) noexcept;
+    ~SuspendedProcessRef ();
+
+    PID          GetPID () const;
+    std::wstring GetName () const;
+
+    bool Terminate (uint32_t exitCode) const;
+
+private:
+    SuspendedProcessRef (HANDLE hProcess, HANDLE hMainThread, ProcessRef::AccessOptions accessOptions);
+
+    ProcessRef m_processRef;
+    HANDLE m_hMainThread;
 };
 
 }   // namespace ETWP

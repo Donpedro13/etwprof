@@ -25,7 +25,7 @@ public:
 
     static Application& Instance ();
 
-    bool Init (const ArgumentVector& arguments);
+    bool Init (const ArgumentVector& arguments, const std::wstring& commandLine);
 
     int Run ();
 
@@ -50,8 +50,9 @@ private:
 
     // Helpers
     Result<std::unique_ptr<WaitableProcessGroup>> GetTargets () const;
+    Result<SuspendedProcessRef>                   StartTarget () const;
         
-    bool HandleArguments (const Application::ArgumentVector& arguments);
+    bool HandleArguments (const Application::ArgumentVector& arguments, const std::wstring& commandLine);
 };
 
 }   // namespace ETWP

@@ -7,7 +7,7 @@ int wmain (int argc, wchar_t* argv[], wchar_t* /*envp[]*/)
     for (int i = 0; i < argc; ++i)
         arguments.push_back (argv[i]);
 
-    if (!ETWP::Application::Instance ().Init (arguments))
+    if (!ETWP::Application::Instance ().Init (arguments, GetCommandLineW ()))
         return int (ETWP::GlobalErrorCodes::InitializationError);
 
     return ETWP::Application::Instance ().Run ();

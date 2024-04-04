@@ -173,7 +173,7 @@ bool ETLReloggerProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo&
     return true;
 }
 
-uint16_t ETLReloggerProfiler::GetNumberOfProfiledProcesses ()
+uint32_t ETLReloggerProfiler::GetNumberOfProfiledProcesses ()
 {
     return 1;
 }

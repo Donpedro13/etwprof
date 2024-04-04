@@ -26,6 +26,7 @@ struct ApplicationRawArguments {
     bool minidumpFlags = false;
     bool userProviders = false;
     bool stackCache = false;
+    bool startCommandLine = false;
     bool noAction = false;
 
     std::wstring outputValue;
@@ -35,6 +36,7 @@ struct ApplicationRawArguments {
     std::wstring compressionMode;
     std::wstring minidumpFlagsValue;
     std::wstring userProvidersValue;
+    std::wstring startCommandLineValue;
 };
 
 struct ApplicationArguments {
@@ -43,6 +45,12 @@ struct ApplicationArguments {
         Off,
         ETW,
         SevenZip
+    };
+
+    enum class TargetMode {
+        None,   // E.g. the command is not to profile anything
+        Attach,
+        Start
     };
 
     struct UserProviderInfo {
@@ -83,9 +91,12 @@ struct ApplicationArguments {
     CompressionMode               compressionMode = CompressionMode::Invalid;
     uint32_t                      minidumpFlags;
     std::vector<UserProviderInfo> userProviderInfos;
+    TargetMode                    targetMode = TargetMode::None;
+    std::wstring                  processToStartCommandLine;
 };
 
 bool ParseArguments (const std::vector<std::wstring>& arguments,
+                     const std::wstring& commandLine,
                      ApplicationRawArguments* pArgumentsOut);
 bool SemaArguments (const ApplicationRawArguments& parsedArgs,
                     ApplicationArguments* pArgumentsOut);

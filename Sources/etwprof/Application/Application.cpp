@@ -94,13 +94,13 @@ Application& Application::Instance ()
     return instance;
 }
 
-bool Application::Init (const ArgumentVector& arguments)
+bool Application::Init (const ArgumentVector& arguments, const std::wstring& commandLine)
 {
 #ifdef ETWP_DEBUG
     InitMemLeakDetection ();
 #endif
 
-    if (!HandleArguments (arguments))
+    if (!HandleArguments (arguments, commandLine))
         return false;
     
     if (!InitCOM ())
@@ -206,7 +206,8 @@ void Application::PrintUsage () const
 
   Usage:
     etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
-    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug]
+    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children] -- <process_path> [<process_args>...]
+    etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
 
   Options:
@@ -264,23 +265,47 @@ bool Application::DoProfile ()
                         L"Starting profiling command",
                         L"Stopping profiling command");
 
-    std::vector<DWORD> targetPIDs;
     std::unique_ptr<WaitableProcessGroup> pTargetGroup;
+    std::vector<ProcessInfo> targetProcessInfos;
+    std::optional<SuspendedProcessRef> startedTarget;
+    // This is needed, because if we start the target to be profiled, we do so in a suspended state. If there is an
+    //  error between this point and resuming the process, we don't want a suspended process to linger around forever...
+    OnExit suspendedTargetKiller ([&startedTarget] () {
+        if (startedTarget.has_value ()) startedTarget->Terminate (1);
+    });
 
     if (!m_args.emulate) {  // In case of emulate mode, we won't have process HANDLEs to open, obviously
-        Result<std::unique_ptr<WaitableProcessGroup>> targetsResult = GetTargets ();
-        if (!targetsResult.has_value()) {
-            Log (LogSeverity::Error, L"Unable to get targets for profiling: " + targetsResult.error ());
+        Result<std::unique_ptr<WaitableProcessGroup>> targetsResult;
+        if (m_args.targetMode == ApplicationArguments::TargetMode::Start) {
+            ETWP_ASSERT (!m_args.processToStartCommandLine.empty ());
 
-            return false;
+            auto startResult = StartTarget ();
+            if (!startResult.has_value ()) {
+                Log (LogSeverity::Error, L"Unable to start target for profiling: " + startResult.error ());
+
+                return false;
+            }
+
+            startedTarget.emplace (std::move (*startResult));
+            targetProcessInfos.push_back({ startedTarget->GetPID (),startedTarget->GetName () });
+        } else if (m_args.targetMode == ApplicationArguments::TargetMode::Attach) {
+            targetsResult = GetTargets ();
+
+            if (!targetsResult.has_value ()) {
+                Log (LogSeverity::Error, L"Unable to get targets for profiling: " + targetsResult.error ());
+
+                return false;
+            }
+
+            pTargetGroup = std::move (*targetsResult);
+
+            for (const auto& t : *pTargetGroup)
+                targetProcessInfos.push_back({ t.first, t.second.GetName ()});
+
+            ETWP_ASSERT (pTargetGroup->GetSize () == targetProcessInfos.size ());
+        } else {
+            ETWP_DEBUG_BREAK_STR (L"Unexpected TargetMode!");
         }
-
-        pTargetGroup = std::move (*targetsResult);
-
-        for (const auto& t : *pTargetGroup)
-            targetPIDs.push_back (t.first);
-
-        ETWP_ASSERT (pTargetGroup->GetSize () == targetPIDs.size ());
     }
 
     // Determine the display name and PID for profiling feedback
@@ -294,16 +319,19 @@ bool Application::DoProfile ()
 
         targetDisplayPID = std::to_wstring (m_args.targetPID);
     } else {
-        if (m_args.targetIsPID) {
+        if (m_args.targetMode == ApplicationArguments::TargetMode::Start) {
+            targetDisplayPID = std::to_wstring (startedTarget->GetPID ());
+            targetDisplayName = startedTarget->GetName ();
+        } else if (m_args.targetIsPID) {
             targetDisplayPID = std::to_wstring (m_args.targetPID);
 
             // If there is a single process to profile *or* we have multiple, *but* all of their names are the same,
             //  then we have an unambigous process name to display
-            const std::wstring& firstProcessName = pTargetGroup->begin ()->second.GetName ();
-            const bool allProcessNamesEqual = std::all_of (pTargetGroup->begin (),
-                                                           pTargetGroup->end(),
-                                                           [&firstProcessName] (const auto& pair) {
-                                                               return pair.second.GetName () == firstProcessName;
+            const std::wstring& firstProcessName = targetProcessInfos.begin ()->imageName;
+            const bool allProcessNamesEqual = std::all_of (targetProcessInfos.begin (),
+                                                           targetProcessInfos.end (),
+                                                           [&firstProcessName] (const auto& info) {
+                                                               return info.imageName == firstProcessName;
                                                            });
 
             if (allProcessNamesEqual)
@@ -311,12 +339,12 @@ bool Application::DoProfile ()
         } else {
             targetDisplayName = m_args.targetName;
 
-            if (pTargetGroup->GetSize () == 1)
-                targetDisplayPID = std::to_wstring (pTargetGroup->begin ()->first);
+            if (targetProcessInfos.size () == 1)
+                targetDisplayPID = std::to_wstring (targetProcessInfos.begin ()->pid);
         }
     }
 
-    ETWP_ASSERT (m_args.emulate == (pTargetGroup == nullptr));
+    ETWP_ASSERT ((m_args.emulate || m_args.targetMode == ApplicationArguments::TargetMode::Start) == (pTargetGroup == nullptr));
 
     std::wstring finalOutputPath = m_args.output;
     // If the specified out path is a folder, we need to generate an appropriate file name, and append it to the output
@@ -324,8 +352,9 @@ bool Application::DoProfile ()
     if (!m_args.outputIsFile) {
         // In case of emulate mode, we won't have a process name. If we have multiple target processes, the first
         //   process' target name and PID is used for file naming purposes
-        const std::wstring processName = pTargetGroup != nullptr ? pTargetGroup->begin ()->second.GetName () : L"";
-        const PID pid = m_args.targetIsPID ? m_args.targetPID : pTargetGroup->begin()->second.GetPID ();
+        const std::wstring processName = targetProcessInfos.empty () ? L"" : targetProcessInfos.begin ()->imageName;
+        const PID pid = m_args.targetIsPID ? m_args.targetPID : targetProcessInfos.begin ()->pid;
+
         finalOutputPath +=
             GenerateFileNameForProcess (processName,
                                         pid,
@@ -380,6 +409,11 @@ bool Application::DoProfile ()
         }
 
         try {
+            std::vector<PID> targetPIDs;
+            std::transform (targetProcessInfos.begin (),
+                            targetProcessInfos.end (),
+                            std::back_inserter (targetPIDs),
+                            [] (const ProcessInfo& info) { return info.pid; });
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
                                                 targetPIDs,
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
@@ -404,7 +438,7 @@ bool Application::DoProfile ()
 
             std::wstring error;
             if (ETWP_ERROR (!CreateMinidump (dumpPath, process.GetHandle (), pid, m_args.minidumpFlags, &error)))
-                Log(LogSeverity::Warning, L"Unable to create minidump: " + error);
+                Log (LogSeverity::Warning, L"Unable to create minidump: " + error);
         }
     }
     
@@ -427,10 +461,15 @@ bool Application::DoProfile ()
         return false;
     }
 
+    if (m_args.targetMode == ApplicationArguments::TargetMode::Start) {
+        SuspendedProcessRef::Resume (std::move (*startedTarget));   // No need for the returned ProcessRef instance
+        suspendedTargetKiller.Deactivate ();
+    }
+
     ProgressFeedback::Style feebackStyle = COut ().GetType () == ConsoleOStream::Type::Console ?
                                            ProgressFeedback::Style::Animated : ProgressFeedback::Style::Static;
     
-    size_t nProcessesProfiling = targetPIDs.size ();
+    size_t nProcessesProfiling = targetProcessInfos.size ();
     auto getDetailString = [&] () {
         std::wstring result = targetDisplayName;
         if (!targetDisplayPID.empty ())
@@ -623,7 +662,14 @@ Result<std::unique_ptr<WaitableProcessGroup>> Application::GetTargets () const
     return result;
 }
 
-bool Application::HandleArguments (const Application::ArgumentVector& arguments)
+Result<SuspendedProcessRef> Application::StartTarget () const
+{
+    return ProcessRef::StartProcessSuspended (m_args.processToStartCommandLine,
+                                              ProcessRef::AccessOptions::Default,
+                                              ProcessRef::CreateOptions::NewConsole);
+}
+
+bool Application::HandleArguments (const Application::ArgumentVector& arguments, const std::wstring& commandLine)
 {
     // Note: There is a chicken and egg problem here. --debug and --verbose are
     //   command line arguments, but debug or verbose mode can be 
@@ -651,7 +697,7 @@ bool Application::HandleArguments (const Application::ArgumentVector& arguments)
 #endif  // #ifdef ETWP_DEBUG
 
     ApplicationRawArguments rawArgs;
-    if (!ParseArguments (arguments, &rawArgs) || !SemaArguments (rawArgs, &m_args)) {
+    if (!ParseArguments (arguments, commandLine, &rawArgs) || !SemaArguments (rawArgs, &m_args)) {
         Log (LogSeverity::Error, L"Invalid arguments!");
         PrintUsage ();
 

@@ -35,7 +35,7 @@ public:
 
     virtual bool EnableProvider (const IETWBasedProfiler::ProviderInfo& providerInfo) override;
 
-    virtual uint16_t GetNumberOfProfiledProcesses () override;
+    virtual uint32_t GetNumberOfProfiledProcesses () override;
 
 private:
     // See the comment in ETLProfiler.hpp as for why we need two locks
