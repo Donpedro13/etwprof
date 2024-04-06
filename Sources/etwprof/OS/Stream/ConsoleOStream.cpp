@@ -329,7 +329,9 @@ void ConsoleOStream::InitType ()
 
 void ConsoleOStream::WriteBytesThroughFile (const void* pBytes, DWORD nBytes)
 {
-    ETWP_VERIFY (WriteFile (m_stdHandle, pBytes, nBytes, nullptr, nullptr));
+    DWORD nBytesWritten = 0;    // Needed for Windows 7 support
+
+    ETWP_VERIFY (WriteFile (m_stdHandle, pBytes, nBytes, &nBytesWritten, nullptr));
 }
 
 void ConsoleOStream::WriteUTF16ThroughConsole (const wchar_t* pString)
