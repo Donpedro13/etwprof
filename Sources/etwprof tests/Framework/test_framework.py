@@ -48,7 +48,7 @@ class TestFailureWithLocation(TestFailure):
             failure_string_trail = f'"{self.expression}"'
 
         if self.message:
-            failure_string_trail += " ".join([failure_string_trail, self.message])
+            failure_string_trail = " ".join([failure_string_trail, self.message])
 
         super().__init__ (f"{self.description} at {self.location}\n\t{failure_string_trail}")
 
