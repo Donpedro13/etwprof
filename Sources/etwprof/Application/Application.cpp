@@ -253,7 +253,7 @@ void Application::PrintLogo () const
 #endif  // #ifdef ETWP_DEBUG
         << L" - " << FgColorWhite << L"https://github.com/Donpedro13/etwprof" << ColorReset << Endl;
 
-    COut () << L"Copyright (c) 2021 " << FgColorWhite << L"P\u00E9ter \u00C9sik" <<
+    COut () << L"Copyright (c) 2024 " << FgColorWhite << L"P\u00E9ter \u00C9sik" <<
         ColorReset << L" - " << FgColorWhite << L"https://peteronprogramming.wordpress.com/" << ColorReset << Endl;
 
     COut () << L"See LICENSE.txt for license details" << Endl << Endl;
