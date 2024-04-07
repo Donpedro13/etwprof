@@ -260,7 +260,10 @@ void ETWProfiler::ProcessStarted (PID pid, PID /*parentPID*/)
         ProcessRef target (pid, ProcessRef::AccessOptions::Synchronize);
         m_targets.Add (std::move (target));
     } catch (const ProcessRef::InitException&) {
-        ETWP_DEBUG_BREAK ();
+        // This can happen, if a to-be profiled process exits very quickly after starting. This causes no problem
+        //  for us, as: - events are still collected for this process (ETW events are a "stream", if you will)
+        //              - the process not being in this container (of HANDLEs) would cause not detecting when it exits;
+        //                  but we could not add it in the first place because it already exited
     }
 }
 
