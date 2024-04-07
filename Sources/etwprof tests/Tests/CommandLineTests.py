@@ -74,7 +74,8 @@ def test_profile_command_real_world():
     expect_zero(_run_command_line_test(["profile", "--outdir=D:\\", "--", get_cmd_path(), "/C", "exit"]))
     expect_zero(_run_command_line_test(["profile", "-t=17816", "--outdir=%TMP%", "--cswitch", "--compress=7z"]))
     expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100", "--children"]))
-    expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
+    if not is_win7_or_earlier():
+        expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
 
 @testcase(suite = _cmd_suite, name = "Argument parsing errors")
 def test_argument_parsing():
