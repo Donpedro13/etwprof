@@ -354,7 +354,6 @@ void ETWProfiler::Profile ()
         }
 
         INormalETWSession* pNormalSession = dynamic_cast<INormalETWSession*> (m_ETWSession.get ());
-        ETWP_ASSERT (pNormalSession != nullptr);    // Win version checked earlier
         for (auto&& providerInfo : filterData.userProviders) {
             if (ETWP_ERROR (!pNormalSession->EnableProvider (&providerInfo.providerID,
                                                              providerInfo.stack,
