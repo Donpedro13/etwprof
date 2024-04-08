@@ -757,7 +757,7 @@ class EtlContentExpectation():
 def get_basic_predicates_for_unknown_process()-> List[Predicate]:
     global unknown_process
 
-    driver_images = [ImageInfo("afd.sys"), ImageInfo("beep.sys"), ImageInfo("ntfs.sys")]
+    driver_images = [ImageInfo("afd.sys"), ImageInfo("ntfs.sys")]
 
     return [ImageSubsetPredicate(unknown_process, driver_images), ProcessLifetimePredicate(unknown_process, PROCESS_LIFETIME_UNKNOWN)]
 
