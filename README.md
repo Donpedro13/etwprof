@@ -45,7 +45,7 @@ Only 64-bit OSes are supported at this time (profiling of 32-bit *processes* a.k
 Download
 ------------
 
-The latest version of etwprof is __0.2__ (released 2019-06-30). Binary distributions are available on the [Releases](https://github.com/Donpedro13/etwprof/releases) page.
+The latest version of etwprof is __0.3__ (released 2024-04-27). Binary distributions are available on the [Releases](https://github.com/Donpedro13/etwprof/releases) page.
 
 For a list of fixes and improvements, check [CHANGELOG.txt](Misc/CHANGELOG.txt).
 
