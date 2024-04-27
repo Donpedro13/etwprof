@@ -24,7 +24,9 @@ private:
 std::wstring GetExePath ();
 std::wstring GetExeFolderPath ();
 
-DWORD GetParentPID ();
+bool GetParentPID (DWORD* pPIDOut);
+
+bool WaitForProcess (WinHandle& hProcess);
 
 }   // namespace PTH
 

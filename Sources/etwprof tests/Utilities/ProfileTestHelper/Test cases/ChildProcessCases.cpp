@@ -80,18 +80,13 @@ std::vector<WinHandle> StartPTHChildren (uint16_t nChildren, bool wait = false)
     return result;
 }
 
-void WaitForProcess (WinHandle& hProcess)
-{
-    DWORD waitResult = WaitForSingleObject (hProcess.Get (), INFINITE);
-        if (waitResult != WAIT_OBJECT_0)
-            std::abort ();
-}
-
 void StartAndWaitForPTHChildren (uint16_t nChildren)
 {
     auto hChildren = StartPTHChildren (nChildren, true);
-    for (auto i = 0; i < nChildren; ++i)
-        WaitForProcess (hChildren[i]);
+    for (auto i = 0; i < nChildren; ++i) {
+        if (!WaitForProcess (hChildren[i]))
+            return Fail (L"Waiting for a child process failed");
+    }
 }
 
 WinHandle RunCommandWithCmdAsChild (const std::wstring& command)
@@ -99,50 +94,54 @@ WinHandle RunCommandWithCmdAsChild (const std::wstring& command)
     return StartProcessImpl (L"C:\\Windows\\System32\\cmd.exe", L"/C" + std::wstring (L" ") + command, true);
 }
 
-static OperationRegistrator registrator1 (L"CreateChildProcess1WaitFor", []() {
-    WaitForProcess (StartPTHChildren (1)[0]);
-
-    return true;
-});
-
-static OperationRegistrator registrator2 (L"CreateChildProcess1", []() {
+OperationRegistrator registrator1 (L"CreateChildProcess1", []() {
     StartPTHChildren (1);
 
     return true;
 });
 
-static OperationRegistrator registrator3 (L"CreateChildProcessMixed5", []() {
+OperationRegistrator registrator2 (L"CreateChildProcess1WaitFor", []() {
+    return WaitForProcess (StartPTHChildren (1)[0]);
+});
+
+OperationRegistrator registrator3 (L"CreateChildProcess1OutlivesParent", []() {
+    StartPTHImpl (L"WaitForParent");
+
+    return true;
+});
+
+OperationRegistrator registrator4 (L"CreateChildProcessMixed5", []() {
     StartPTHChildren (4);
     RunCommandWithCmdAsChild (L"");
 
     return true;
 });
 
-static OperationRegistrator registrator4 (L"CreateChildProcess128", []() {
+OperationRegistrator registrator5 (L"CreateChildProcess128", []() {
     StartPTHChildren (128);
 
     return true;
 });
 
-static OperationRegistrator registrator5 (L"CreateChildProcessCascade5", []() {
+OperationRegistrator registrator6 (L"CreateChildProcessCascade5", []() {
     StartPTHImpl (L"CreateChildProcessCascade4");
 
     return true;
 });
 
-static OperationRegistrator registrator6 (L"CreateChildProcessCascade4", []() {
+OperationRegistrator registrator7 (L"CreateChildProcessCascade4", []() {
     StartPTHImpl(L"CreateChildProcessCascade3");
 
     return true;
 });
 
-static OperationRegistrator registrator7 (L"CreateChildProcessCascade3", []() {
+OperationRegistrator registrator8 (L"CreateChildProcessCascade3", []() {
     StartPTHImpl(L"CreateChildProcessCascade2");
 
     return true;
 });
 
-static OperationRegistrator registrator8 (L"CreateChildProcessCascade2", []() {
+OperationRegistrator registrator9 (L"CreateChildProcessCascade2", []() {
     StartPTHImpl (L"CreateChildProcess1");
 
     return true;
@@ -155,19 +154,18 @@ static OperationRegistrator registrator8 (L"CreateChildProcessCascade2", []() {
 //  processes (also) wait on the "global cancel event", that's when they know when they need to exit. In other words:
 //  child PTHs' operations will get cancelled.
 
-static OperationRegistrator registrator9 (L"CreateProcessTreeWith5PTHs", []() {
+OperationRegistrator registrator10 (L"CreateProcessTreeWith5PTHs", []() {
     StartAndWaitForPTHChildren (5);
 
     return true;
 });
 
-static OperationRegistrator registrator10 (L"CreateProcess5TreeMixed", []() {
+OperationRegistrator registrator11 (L"CreateProcess5TreeMixed", []() {
     // We create a cmd.exe in our tree, and make it wait by starting a PTH process and making it wait for its completion
     auto hCmd = RunCommandWithCmdAsChild (L"start /w " + GetExePath () + L" DoNothing");
     StartAndWaitForPTHChildren (4);
-    WaitForProcess (hCmd);
-
-    return true;
+    
+    return WaitForProcess (hCmd);
 });
 
 }	// namespace

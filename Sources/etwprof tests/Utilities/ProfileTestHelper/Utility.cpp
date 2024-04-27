@@ -51,7 +51,7 @@ std::wstring GetExeFolderPath ()
 	return std::filesystem::path (exePath).remove_filename ();
 }
 
-DWORD GetParentPID ()
+bool GetParentPID (DWORD* pPIDOut)
 {
     DWORD ownPID = GetCurrentProcessId ();
 
@@ -63,17 +63,24 @@ DWORD GetParentPID ()
     processEntry.dwSize = sizeof processEntry;
 
     if (!Process32FirstW (hSnapshot, &processEntry))
-        Fail (L"Unable to get info for the first process in process snapshot!");
+        return false;
 
     do {
         if (processEntry.th32ProcessID == ownPID) {
             CloseHandle (hSnapshot);
 
-            return processEntry.th32ParentProcessID;
+            *pPIDOut = processEntry.th32ParentProcessID;
+
+            return true;
         }
     } while (Process32NextW (hSnapshot, &processEntry));
 
-    Fail (L"Unable to find process in process snapshot!");
+    return false;
+}
+
+bool WaitForProcess (WinHandle& hProcess)
+{
+    return WaitForSingleObject (hProcess.Get (), INFINITE) == WAIT_OBJECT_0;
 }
 
 } // namespace PTH

@@ -20,6 +20,7 @@ struct ApplicationRawArguments {
     bool samplingRate = false;
     bool target = false;
     bool profileChildren = false;
+    bool waitForChildren = false;
     bool emulate = false;
     bool cswitch = false;
     bool minidump = false;
@@ -76,6 +77,7 @@ struct ApplicationArguments {
     bool outputIsFile = false;
     bool targetIsPID = false;
     bool profileChildren = false;
+    bool waitForChildren = false;
     bool emulate = false;
     bool debug = false;
     bool cswitch = false;

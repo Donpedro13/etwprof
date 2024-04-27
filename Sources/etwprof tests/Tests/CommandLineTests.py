@@ -45,6 +45,7 @@ def test_profile_command():
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--nologo"])))
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--children"])))
+    expect_zero(_run_command_line_test(_create_valid_profile_args(["--children", "--waitchildren"])))
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["-m"])))
     expect_zero(_run_command_line_test(_create_valid_profile_args(["-m", "--mflags=0x3456"])))
@@ -101,6 +102,8 @@ def test_profile_erroneous():
     expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "--"])) # Process to be launched is not specified
 
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--mflags=0"])))   # w/o -m
+
+    expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--waitchildren"])))   # w/o --children
 
     # Invalid compression methods
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--compress=7y"])))

@@ -197,8 +197,8 @@ void Application::PrintUsage () const
         LR"(etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
-    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children] -- <process_path> [<process_args>...]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]]
+    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]] -- <process_path> [<process_args>...]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
 
@@ -211,6 +211,7 @@ void Application::PrintUsage () const
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --children       Profile child processes, as well
+    --waitchildren   Profiling waits for child processes as well, transitively
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
@@ -409,7 +410,10 @@ bool Application::DoProfile ()
             m_pProfiler.reset (new ETWProfiler (profilerOutputPath,
                                                 targetPIDs,
                                                 ConvertSamplingRateFromHz (m_args.samplingRate),
-                                                options));
+                                                options,
+                                                m_args.waitForChildren ?
+                                                    ETWProfiler::FinishCriterion::AllTargetsFinished :
+                                                    ETWProfiler::FinishCriterion::OriginalTargetsFinished));
         } catch (const IProfiler::InitException& e) {
             Log (LogSeverity::Error, L"Unable to construct profiler object: " + e.GetMsg ());
 
@@ -454,7 +458,16 @@ bool Application::DoProfile ()
     }
 
     if (m_args.targetMode == ApplicationArguments::TargetMode::Start) {
-        SuspendedProcessRef::Resume (std::move (*startedTarget));   // No need for the returned ProcessRef instance
+        try {
+            SuspendedProcessRef::Resume (std::move (*startedTarget));   // No need for the returned ProcessRef instance
+        } catch (const ProcessRef::InitException& e) {
+            m_pProfiler->Abort ();
+
+            Log (LogSeverity::Error, L"Failed to resume suspended process that was started: " + e.GetMsg ());
+
+            return false;
+        }
+
         suspendedTargetKiller.Deactivate ();
     }
 

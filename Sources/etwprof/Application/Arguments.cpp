@@ -288,6 +288,10 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
         pArgumentsOut->profileChildren = true;
 
         return true;
+    } else if (argName == L"waitchildren") {
+        pArgumentsOut->waitForChildren = true;
+
+        return true;
     }
 
     LogFailedParse (L"Unknown non-value argument!", arg);
@@ -575,6 +579,21 @@ bool SemaMinidump (const ApplicationRawArguments& parsedArgs, ApplicationArgumen
                                                                           nullptr,
                                                                           16));
     }
+
+    return true;
+}
+
+bool SemaChildProcessProfiling (const ApplicationRawArguments& parsedArgs, ApplicationArguments* /*pArgumentsOut*/)
+{
+    if (parsedArgs.waitForChildren && !parsedArgs.profileChildren) {
+        LogFailedSema (L"\"Wait for children\" parameter requires --children!");
+
+        return false;
+    }
+
+    // If we have --waitchildren *and* --emulate: there's nothing to wait for, so this argument does not make sense
+    //  in this case. However, allowing it is benign; we don't want to force users to remove it just for the sake
+    //  of being pedantic...
 
     return true;
 }
@@ -1003,6 +1022,7 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     pArgumentsOut->help = parsedArgs.help;
     pArgumentsOut->debug = parsedArgs.debug;
     pArgumentsOut->profileChildren = parsedArgs.profileChildren;
+    pArgumentsOut->waitForChildren = parsedArgs.waitForChildren;
     pArgumentsOut->emulate = parsedArgs.emulate;
     pArgumentsOut->cswitch = parsedArgs.cswitch;
     pArgumentsOut->minidump = parsedArgs.minidump;
@@ -1036,6 +1056,9 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
         if (!SemaMinidump (parsedArgs, pArgumentsOut))
             return false;
 
+        if (!SemaChildProcessProfiling (parsedArgs, pArgumentsOut))
+            return false;
+
         if (!SemaUserProviderInfos (parsedArgs, pArgumentsOut))
             return false;
 
@@ -1067,7 +1090,13 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
         }
 
         if (parsedArgs.profileChildren) {
-            LogFailedSema(L"Children profiling parameter is only valid for profiling!");
+            LogFailedSema (L"Children profiling parameter is only valid for profiling!");
+
+            return false;
+        }
+
+        if (parsedArgs.waitForChildren) {
+            LogFailedSema (L"\"Wait for child processes\" profiling parameter is only valid for profiling!");
 
             return false;
         }

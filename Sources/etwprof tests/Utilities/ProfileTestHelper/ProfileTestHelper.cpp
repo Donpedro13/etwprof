@@ -39,7 +39,10 @@ void Usage ()
 WinHandle GetStartSignalHandle ()
 {
     // Construct the name of the event used for synchronization
-    const DWORD parentPID = GetParentPID ();
+    DWORD parentPID = 0;
+    if (!GetParentPID (&parentPID))
+        Fail (L"Unable to get PID of parent process!");
+
     const DWORD pid = GetCurrentProcessId ();
 
     const std::wstring eventName = L"PTH_event_" + std::to_wstring (parentPID) + L"_" + std::to_wstring (pid);

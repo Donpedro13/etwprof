@@ -162,10 +162,15 @@ def test_multiple_target_processes_many_various_ops():
 
     evaluate_profile_test(list_files_in_dir(fixture.outdir), expectations)
 
-def _test_children_impl(count:int, cascading = False):
-    operation = f"CreateChildProcessCascade{count}" if cascading else f"CreateChildProcess{count}"
+def _test_children_impl(count:int, operation = None, waitforchilden = True):
+    if not operation:
+        operation = f"CreateChildProcess{count}"
 
-    filelist, processes = perform_profile_test(operation, fixture.outdir, ["--children"])
+    extra_args = ["--children"]
+    if waitforchilden:
+        extra_args.append("--waitchildren")
+
+    filelist, processes = perform_profile_test(operation, fixture.outdir, extra_args)
     expected_process_counts = { unknown_process.image_name : 1, PTH_EXE_NAME: 1 + count}
     process_predicate = ProcessSubsetAndThenCountsPredicate(processes, expected_process_counts)
 
@@ -189,7 +194,12 @@ def test_child_processes_many():
 
 @testcase(suite = _profile_suite, name = "Child processes (cascading)", fixture = ProfileTestsFixture())
 def test_child_processes_cascading():
-    _test_children_impl(5, True)
+    _test_children_impl(5, "CreateChildProcessCascade5")
+
+@testcase(suite = _profile_suite, name = "Child processes (profiling not waiting for grandchildren)", fixture = ProfileTestsFixture())
+def test_child_processes_outlives_parent():
+    # TODO: improve test oracle here, no real chance of detecting if a failure happens in the current state
+    _test_children_impl(1, "CreateChildProcess1OutlivesParent", False)
 
 def _test_children_process_tree_impl(tree_operations: Iterable[str], process_counts: dict[str, int], trace_children = True):
     from contextlib import ExitStack
@@ -205,7 +215,7 @@ def _test_children_process_tree_impl(tree_operations: Iterable[str], process_cou
     #   "multiple process" support that works based on process name
     target = pths[0].pid if len(pths) == 1 else PTH_EXE_NAME
 
-    with ExitStack() as stack, EtwprofProcess.attach_to_profilee(target, fixture.outdir, ["--children"] if trace_children else []) as etwprof:
+    with ExitStack() as stack, EtwprofProcess.attach_to_profilee(target, fixture.outdir, ["--children", "--waitchildren"] if trace_children else []) as etwprof:
         for p in pths:
             stack.enter_context(p)
 

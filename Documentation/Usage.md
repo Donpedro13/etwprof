@@ -7,8 +7,8 @@ Please see "Usage" on the [Readme page](../README.md) first.
 etwprof
 
   Usage:
-    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children]
-    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children] -- <process_path> [<process_args>...]
+    etwprof profile --target=<PID_or_name> (--output=<file_path> | --outdir=<dir_path>) [--mdump [--mflags]] [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]]
+    etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]] -- <process_path> [<process_args>...]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
 
@@ -21,6 +21,7 @@ etwprof
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --children       Profile child processes, as well
+    --waitchildren   Profiling waits for child processes as well, transitively
     --outdir=<od>    Output directory path
     --nologo         Do not print logo
     --rate=<r>       Sampling rate (in Hz) [default: use current global rate]
@@ -42,7 +43,7 @@ Provides even more verbose output than `-v --verbose`. Intermediate results are 
 * `--mflags`  
 See the [documentation](https://msdn.microsoft.com/en-us/library/windows/desktop/ms680519(v=vs.85).aspx) for possible values.
 * `--children`  
-Child processes are included recursively. Because ETW process start/end events are used for this feature, if ETW events are dropped, etwprof might miss child processes.
+Child processes are included transitively. Profiling stops when the original target processes exit, even if there are still child processes running (see `--waitchildren`). Because ETW process start/end events are used for this feature, if ETW events are dropped, etwprof might miss child processes.
 * `--outdir`  
 With this option, etwprof will choose a convenient output filename for you.
 * `--outdir`, `--output`  

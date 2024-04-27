@@ -29,16 +29,23 @@ class ETWProfiler final : public IETWBasedProfiler, public ProcessLifetimeObserv
 public:
     // Meaning of State values:
     //   Unstarted      ->  Initialized, but not started yet
-    //   Running        ->  Target is being profiled
-    //   Finished       ->  Target process exited
+    //   Running        ->  Targets are being profiled
+    //   Finished       ->  Target processes exited
     //   Stopped        ->  Profiling was stopped externally
     //   Aborted        ->  Profiling was stopped due to an unexpected condition
     //   Error          ->  Profiling stopped because of an error
 
+    // Controls when profiling should be considered finished
+    enum class FinishCriterion {
+        AllTargetsFinished, // Relevant only if ProfileChildren is set in the options
+        OriginalTargetsFinished
+    };
+
     ETWProfiler (const std::wstring& outputPath,
                  const std::vector<PID>& targetPIDs,
                  const ProfileRate& samplingRate,
-                 IETWBasedProfiler::Flags options);
+                 IETWBasedProfiler::Flags options,
+                 FinishCriterion finishCriterion = FinishCriterion::AllTargetsFinished);
     virtual ~ETWProfiler () override;
 
     virtual bool Start (std::wstring* pErrorOut) override;
@@ -66,11 +73,13 @@ private:
 
     std::unique_ptr<IKernelETWSession> m_ETWSession;
 
-    WaitableProcessGroup       m_targets;
+    WaitableProcessGroup       m_originalTargets;
+    WaitableProcessGroup       m_additionalTargets;
     ProviderInfos              m_userProviders;
 
     ProfileRate                m_samplingRate;
     IETWBasedProfiler::Options m_options;
+    FinishCriterion            m_finishCriterion;
     std::wstring               m_outputPath;
 
     State m_state;
@@ -94,8 +103,9 @@ private:
     void  SetState (State newState);
     State GetState ();
 
-    bool HaveAllTargetProcessesExited (); // Not thread safe
-    void WaitForProfilerThread ();       // Not thread safe
+    bool HaveAllTargetProcessesExited ();       // Not thread safe
+    bool HaveOriginalTargetProcessesExited ();  // Not thread safe
+    void WaitForProfilerThread ();              // Not thread safe
 };
 
 }   // namespace ETWP

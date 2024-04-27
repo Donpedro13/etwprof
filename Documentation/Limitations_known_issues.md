@@ -22,3 +22,4 @@ General limitations
   * it will be started with the same privileges etwprof has
   * if the profilee is a console application, a new console window will be created
   * the "normal" command line arguments of etwprof should not contain double dashes
+* When using the `--waitchildren` parameter, profiling might not stop automatically when all child processes exit. Keep this in mind when running the tool unattended. This is due to a race condition related to how etwprof waits for target processes and the reuse of process IDs by the operating system.

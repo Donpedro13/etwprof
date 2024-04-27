@@ -34,15 +34,17 @@ namespace ETWP {
 ETWProfiler::ETWProfiler (const std::wstring& outputPath,
                           const std::vector<PID>& targetPIDs,
                           const ProfileRate& samplingRate,
-                          IETWBasedProfiler::Flags options):
+                          IETWBasedProfiler::Flags options,
+                          FinishCriterion finishCriterion):
     m_lock (),
     m_resultLock (),
     m_hWorkerThread (nullptr),
     m_ETWSession (nullptr),
-    m_targets (),
+    m_originalTargets (),
     m_userProviders (),
     m_samplingRate (samplingRate),
     m_options (static_cast<Options> (options)),
+    m_finishCriterion (finishCriterion),
     m_outputPath (outputPath),
     m_state (State::Unstarted),
     m_errorFromWorkerThread ()
@@ -57,7 +59,7 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     for (auto pid : targetPIDs) {
         try {
             ProcessRef target (pid, ProcessRef::AccessOptions::Synchronize);
-            m_targets.Add (std::move (target));
+            m_originalTargets.Add (std::move (target));
         } catch (ProcessRef::InitException& e) {            
             throw InitException (L"Unable to open HANDLE for target process with pid " +
                                  std::to_wstring (pid) + L"(" + e.GetMsg () + L")" + L"!");
@@ -206,7 +208,9 @@ bool ETWProfiler::IsFinished (State* pResultOut, std::wstring* pErrorOut)
     }
 
     // If the profiler thread is still running, poll the target process(es) to see if they have finished yet
-    if (HaveAllTargetProcessesExited ()) {
+    if (m_finishCriterion == FinishCriterion::AllTargetsFinished ?
+            HaveAllTargetProcessesExited () : HaveOriginalTargetProcessesExited ())
+    {
         SetState (State::Finished);
 
         StopImpl ();    // Stop the kernel session, wait for the thread to finish
@@ -240,7 +244,8 @@ bool ETWProfiler::EnableProvider (const IETWBasedProfiler::ProviderInfo& provide
 
 uint32_t ETWProfiler::GetNumberOfProfiledProcesses ()
 {
-    return m_targets.GetWaitingSize (); // m_targets has its own lock
+    // These two members have their own lock
+    return m_originalTargets.GetWaitingSize () + m_additionalTargets.GetWaitingSize ();
 }
 
 unsigned int ETWProfiler::ProfileHelper (void* instance)
@@ -258,7 +263,7 @@ void ETWProfiler::ProcessStarted (PID pid, PID /*parentPID*/)
 {
     try {
         ProcessRef target (pid, ProcessRef::AccessOptions::Synchronize);
-        m_targets.Add (std::move (target));
+        m_additionalTargets.Add (std::move (target));
     } catch (const ProcessRef::InitException&) {
         // This can happen, if a to-be profiled process exits very quickly after starting. This causes no problem
         //  for us, as: - events are still collected for this process (ETW events are a "stream", if you will)
@@ -269,7 +274,7 @@ void ETWProfiler::ProcessStarted (PID pid, PID /*parentPID*/)
 
 void ETWProfiler::ProcessEnded (PID pid, PID /*parentPID*/)
 {
-    m_targets.Delete (pid);
+    m_additionalTargets.Delete (pid);
 }
 
 void ETWProfiler::StopImpl ()
@@ -289,7 +294,7 @@ void ETWProfiler::Profile ()
     ETWP_DEBUG_ONLY (OnExit stateChecker ([this]() { ETWP_ASSERT (GetState () != State::Running); }));
 
     std::unordered_set<DWORD> targetPIDs;
-    for (const auto& [pid, _] : m_targets)
+    for (const auto& [pid, _] : m_originalTargets)
         targetPIDs.insert (pid);
 
     // Create copy of data needed by the filtering relogger callback, so it can run lockless
@@ -492,7 +497,12 @@ IProfiler::State ETWProfiler::GetState ()
 
 bool ETWProfiler::HaveAllTargetProcessesExited ()
 {
-    return m_targets.IsAllFinished ();
+    return HaveOriginalTargetProcessesExited () && m_additionalTargets.IsAllFinished ();
+}
+
+bool ETWProfiler::HaveOriginalTargetProcessesExited ()
+{
+    return m_originalTargets.IsAllFinished ();
 }
 
 void ETWProfiler::WaitForProfilerThread ()
