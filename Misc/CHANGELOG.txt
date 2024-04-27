@@ -1,3 +1,21 @@
+=== 0.3 ===
+Features:
+- ETW's stack caching feature is now supported
+- Added support for multiple process profiling (e.g. when multiple processes with the given name exist) (#1)
+- Added support for profiling child processes (#5)
+- Starting the process to be profiled is now supported
+- Windows Server is now supported
+- Redirecting etwprof's output to a file is now a first-class feature
+
+Bugfixes:
+- Fixed a bug that could cause loss of events for a thread that were emitted shortly before that thread exited. This also made collecting context switches reliable (#3).
+- Fixed a crash on Windows 7 when the output of etwprof was redirected to a file
+- Stopping the ETW session of etwprof is now handled gracefully
+
+Miscellaneous:
+- A broad set of automated end-to-end testing was introduced, which should increase the overall quality of etwprof, and reduce the chance of future regressions
+- Upgraded 7zr.exe to 23.1.0
+
 === 0.2 ===
 Features:
 - Response files are supported
