@@ -6,6 +6,7 @@ def setup_importdirs():
 
     sys.path.append(os.path.join(scriptdir, "Framework"))
     sys.path.append(os.path.join(scriptdir, "Tests"))
+    sys.path.append(os.path.join(scriptdir))
 
 setup_importdirs()
 
@@ -205,8 +206,8 @@ def has_admin_privileges():
     return IsUserAnAdmin()
 
 def check_prerequisites(testbin_folder_path):
-    if sys.version_info[0] != 3:
-        fail("Python 3 is required to run this script!")
+    if sys.version_info < (3, 4):
+        fail("Python 3.4 or higher is required to run this script!")
 
     if not os.path.exists(testbin_folder_path):
         fail("Test binary folder path is invalid or does not exist!")
