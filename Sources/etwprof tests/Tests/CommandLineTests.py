@@ -40,7 +40,7 @@ def test_profile_command():
     expect_zero(_run_command_line_test(["profile", "-t=123456", "-o=C:\\whatever.etl"]))
     expect_zero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=C:\\"]))
     expect_zero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=%TMP%"]))
-    expect_zero(_run_command_line_test(["profile", "--outdir=D:\\", "--", get_cmd_path(), "--arg1=a", "--test", "--", "-a"]))
+    expect_zero(_run_command_line_test(["profile", "--outdir=C:\\", "--", get_cmd_path(), "--arg1=a", "--test", "--", "-a"]))
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--nologo"])))
 
@@ -72,7 +72,7 @@ class _RealWorldTestsFixture:
 @testcase(suite = _cmd_suite, name = "Profile command real-world", fixture = _RealWorldTestsFixture())
 def test_profile_command_real_world():
     expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "-o=C:\\mytrace.etl"]))
-    expect_zero(_run_command_line_test(["profile", "--outdir=D:\\", "--", get_cmd_path(), "/C", "exit"]))
+    expect_zero(_run_command_line_test(["profile", "--outdir=C:\\", "--", get_cmd_path(), "/C", "exit"]))
     expect_zero(_run_command_line_test(["profile", "-t=17816", "--outdir=%TMP%", "--cswitch", "--compress=7z"]))
     expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100", "--children"]))
     if not is_win7_or_earlier():
@@ -96,10 +96,10 @@ def test_profile_erroneous():
     expect_nonzero(_run_command_line_test(["profile", "-t=something.exe", "--outdir=C:\\this_folder_does_not_exist"]))
     expect_nonzero(_run_command_line_test(["profile", "-t=123", "-o=C:\\test.etlbadextenstion"]))
     expect_nonzero(_run_command_line_test(["profile", "-t=123", "--compress=7z", "-o=C:\\test.etl"]))   # etl instead of 7z as extension
-    expect_nonzero(_run_command_line_test(["profile", "-t=123", "--outdir=D:\\", "--", get_cmd_path()])) # Both a target is specified, and an executable is provided to be launched
-    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "-m", "--", get_cmd_path()])) # Minidump requested, even though the profiled process is to be launched
-    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "-m", "--", "DoesNotExist.exe"])) # Process to be launched does not exist
-    expect_nonzero(_run_command_line_test(["profile", "--outdir=D:\\", "--"])) # Process to be launched is not specified
+    expect_nonzero(_run_command_line_test(["profile", "-t=123", "--outdir=C:\\", "--", get_cmd_path()])) # Both a target is specified, and an executable is provided to be launched
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=C:\\", "-m", "--", get_cmd_path()])) # Minidump requested, even though the profiled process is to be launched
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=C:\\", "-m", "--", "DoesNotExist.exe"])) # Process to be launched does not exist
+    expect_nonzero(_run_command_line_test(["profile", "--outdir=C:\\", "--"])) # Process to be launched is not specified
 
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--mflags=0"])))   # w/o -m
 
