@@ -7,6 +7,7 @@
 #include <atlbase.h>
 #include <atlcom.h>
 
+#include <evntrace.h>
 #include <relogger.h>
 
 #include <functional>
