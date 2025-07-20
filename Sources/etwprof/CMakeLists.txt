@@ -133,6 +133,9 @@ TARGET_INCLUDE_DIRECTORIES(etwprof PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 TARGET_COMPILE_OPTIONS(etwprof PRIVATE "/guard:cf")
 SET_PROPERTY(TARGET etwprof APPEND PROPERTY LINK_FLAGS "/guard:cf")	# There is no TARGET_LINK_OPTIONS...
 
+# Make sure etwprof can't even be started pre-Win 10
+SET_PROPERTY(TARGET etwprof APPEND PROPERTY LINK_FLAGS "/SUBSYSTEM:CONSOLE,10")
+
 # Version
 SET(major_version 0)
 SET(minor_version 4)
