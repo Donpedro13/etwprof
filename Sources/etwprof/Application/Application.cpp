@@ -234,10 +234,12 @@ void Application::PrintLogo () const
         L"." ETWP_EXPAND_AND_STRINGIFY_WIDE (ETWP_PATCH_VERSION)
 #endif
 
-#ifdef _WIN64
+#ifdef _M_AMD64 
         L" (x64)"
+#elif defined(_M_ARM64)
+        L" (arm64)"
 #else
-        L" (x86)"
+#error "Unsupported architecture!"
 #endif  // #ifdef _WIN64
 
 #ifdef ETWP_DEBUG

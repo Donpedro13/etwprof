@@ -111,7 +111,16 @@ SET(kerneltracecontrol_target_location
 SET(7zr_target_location
 		${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_CFG_INTDIR}/7zr.exe)
 
-ADD_CUSTOM_COMMAND(OUTPUT ${kerneltracecontrol_target_location} COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/3rdparty/kerneltracecontrol.dll ${kerneltracecontrol_target_location})
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64")
+    set(kerneltracecontrol_dll_name "kerneltracecontrol_x64.dll")
+elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64")
+    set(kerneltracecontrol_dll_name "kerneltracecontrol_arm64.dll")
+endif()
+
+SET(kerneltracecontrol_source_location
+        ${PROJECT_SOURCE_DIR}/3rdparty/${kerneltracecontrol_dll_name})
+
+ADD_CUSTOM_COMMAND(OUTPUT ${kerneltracecontrol_target_location} COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/3rdparty/${kerneltracecontrol_dll_name} ${kerneltracecontrol_target_location})
 ADD_CUSTOM_COMMAND(OUTPUT ${7zr_target_location} COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/3rdparty/7zr.exe ${7zr_target_location})
 
 SET(3rdparty_binaries
