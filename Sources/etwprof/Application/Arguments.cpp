@@ -8,8 +8,6 @@
 
 #include "OS/FileSystem/Utility.hpp"
 
-#include "OS/Version/WinVersion.hpp"
-
 #include "Utility/Asserts.hpp"
 #include "Utility/GUID.hpp"
 #include "Utility/ResponseFile.hpp"
@@ -819,14 +817,6 @@ bool SemaUserProviderInfos (const ApplicationRawArguments& parsedArgs, Applicati
     if (!parsedArgs.userProviders)
         return true;
 
-    // User providers are supported on Win8+ only
-    if (GetWinVersion () < BaseWinVersion::Win8) {
-        Log (LogSeverity::Error,
-             L"User providers are supported on Windows 8 and later only! Events from these providers will not be collected!");
-
-        return false;
-    }
-
     switch (DetermineUserProviderInfoVersion (parsedArgs.userProvidersValue)) {
         case UserProviderInfoVersion::One:
             return SemaUserProviderInfosVersionOne (parsedArgs, pArgumentsOut);
@@ -844,12 +834,6 @@ bool SemaStackCache (const ApplicationRawArguments& parsedArgs, ApplicationArgum
 
 	if (pArgumentsOut->emulate) {
 		LogFailedSema (L"ETW stack caching parameter is invalid in emulate mode!");
-
-		return false;
-	}
-
-	if (GetWinVersion () < BaseWinVersion::Win8) {
-        Log (LogSeverity::Error, L"ETW stack caching is supported on Windows 8 and later only!");
 
 		return false;
 	}

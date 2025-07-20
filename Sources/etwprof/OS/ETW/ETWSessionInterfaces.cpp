@@ -14,7 +14,7 @@ IKernelETWSession::~IKernelETWSession ()
 
 }
 
-INormalETWSession::~INormalETWSession ()
+IUserETWSession::~IUserETWSession ()
 {
 
 }

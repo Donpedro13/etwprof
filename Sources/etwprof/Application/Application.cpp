@@ -178,9 +178,9 @@ int Application::Run ()
 
 bool Application::CheckWinVersion () const
 {
-    constexpr BaseWinVersion kMinVersion = BaseWinVersion::Win7;
+    constexpr BaseWinVersion kMinVersion = BaseWinVersion::Win10;
     constexpr wchar_t kwinVersionError[] = L"Invalid Windows version! "
-        L"Windows 7 or later is required to run this program. ";
+        L"Windows 10 or later is required to run this program. ";
     
     if (GetWinVersion () < kMinVersion) {
         Log (LogSeverity::Error, kwinVersionError);

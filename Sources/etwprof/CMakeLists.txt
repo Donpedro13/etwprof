@@ -25,16 +25,12 @@ SET(etwprof_sources
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/ETWSessionCommon.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/ETWSessionInterfaces.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/ETWSessionInterfaces.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/NormalETWSession.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/NormalETWSession.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/TraceRelogger.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/TraceRelogger.hpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Utils.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Utils.hpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win7KernelSession.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win7KernelSession.hpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win8PlusKernelSession.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/Win8PlusKernelSession.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/CombinedETWSession.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/OS/ETW/CombinedETWSession.hpp
 
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/FileSystem/Utility.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/OS/FileSystem/Utility.hpp

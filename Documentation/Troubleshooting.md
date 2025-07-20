@@ -11,7 +11,7 @@ If you encounter any crashes, please create a minidump (you can instruct Windows
 Invalid/unusable output `.etl` file
 ----------
 
-If you believe the result `.etl` file etwprof produced is incorrect, check if [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)/[xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) handles your scenario correctly. If you are on Windows 8 or later, it's best to run [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)/[xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) and etwprof *in parallel*:
+If you believe the result `.etl` file etwprof produced is incorrect, check if [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)/[xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) handles your scenario correctly. It's best to run [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)/[xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10)) and etwprof *in parallel*:
 * Start tracing with [WPR](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)/[xperf](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh162920(v=win.10))
 * Start tracing with etwprof
 * Perform your scenario

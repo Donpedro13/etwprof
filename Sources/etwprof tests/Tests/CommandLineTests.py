@@ -56,11 +56,7 @@ def test_profile_command():
 
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--rate=1000"])))
 
-    def test_scache(): return _run_command_line_test(_create_valid_profile_args(["--scache"]))
-    if is_win7_or_earlier():
-        expect_nonzero(test_scache())   # Not supported on Win7
-    else:
-        expect_zero(test_scache())
+    expect_zero(_run_command_line_test(_create_valid_profile_args(["--scache"])))
 
 class _RealWorldTestsFixture:
     def setup(self):
@@ -75,8 +71,7 @@ def test_profile_command_real_world():
     expect_zero(_run_command_line_test(["profile", "--outdir=C:\\", "--", get_cmd_path(), "/C", "exit"]))
     expect_zero(_run_command_line_test(["profile", "-t=17816", "--outdir=%TMP%", "--cswitch", "--compress=7z"]))
     expect_zero(_run_command_line_test(["profile", "-v", "--nologo", "-t=notepad.exe", f"--outdir={fixture.dir}", "-m", "--rate=100", "--children"]))
-    if not is_win7_or_earlier():
-        expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
+    expect_zero(_run_command_line_test(["profile", "-t=notepad.exe", "--outdir=%USERPROFILE%", "--enable=Microsoft-Windows-RPC", "--debug"]))
 
 @testcase(suite = _cmd_suite, name = "Argument parsing errors")
 def test_argument_parsing():
@@ -167,12 +162,6 @@ def test_emulate_mode():
 
 @testcase(suite = _cmd_suite, name = "User providers")
 def test_user_providers():
-    # On Win 7, user providers are not supported; test just a single case
-    if is_win7_or_earlier():
-        expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--enable=Microsoft-Windows-RPC"])))
-
-        return
-
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--enable=*Microsoft-Windows-WER-PayloadHealth"])))
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--enable=017247f2-7e96-11dc-8314-0800200c9a66"])))
     expect_zero(_run_command_line_test(_create_valid_profile_args(["--enable=017247F2-7E96-11DC-8314-0800200C9A66"])))  # Same as above, but with capital letters
@@ -190,10 +179,6 @@ def test_user_providers():
 
 @testcase(suite = _cmd_suite, name = "User providers erroneous")
 def test_user_providers_erroneous():
-    # User providers are not supported on Win7 anyway, so no point in testing erroneous cases
-    if is_win7_or_earlier():
-        return
-
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--enable=DoesNotExist"])))
     # Looks almost like a GUID, but it's not; etwprof should interpret it as a registered name
     expect_nonzero(_run_command_line_test(_create_valid_profile_args(["--enable=017247f2-7e96-11dc-8314-0800200c9a6"])))

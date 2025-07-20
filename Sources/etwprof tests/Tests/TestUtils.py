@@ -154,11 +154,6 @@ def create_temp_file(content):
 def create_temp_dir():
     return tempfile.mkdtemp()
 
-def is_win7_or_earlier() -> bool:
-    v = sys.getwindowsversion()
-
-    return v.major == 6 and v.minor <= 1
-
 _XPERF_ETW_SESSIONS_RE = re.compile(r"Logger Name\s*:\s*(?P<session_name>.*)")
 
 def _get_etw_session_list() -> list[str]:
@@ -174,10 +169,7 @@ def _get_etw_session_list() -> list[str]:
     return session_names
 
 def _is_relevant_session(name: str) -> bool:
-    if is_win7_or_earlier():
-        return name == "NT Kernel Logger"
-    else:
-        return name.lower().startswith("etwprof")
+    return name.lower().startswith("etwprof")
 
 def _get_all_running_etwprof_sessions() -> list[str]:
     sessions = _get_etw_session_list()

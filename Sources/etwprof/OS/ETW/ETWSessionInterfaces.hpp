@@ -34,7 +34,7 @@ public:
     virtual ~IKernelETWSession ();
 };
 
-class INormalETWSession : public virtual IETWSession {
+class IUserETWSession : public virtual IETWSession {
 public:
     virtual bool EnableProvider (LPCGUID pProviderID,
                                  bool collectStacks,
@@ -44,7 +44,7 @@ public:
 
     virtual bool DisableProvider (LPCGUID pProviderID) = 0;
 
-    virtual ~INormalETWSession ();
+    virtual ~IUserETWSession ();
 };
 
 }   // namespace ETWP

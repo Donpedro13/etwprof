@@ -8,7 +8,6 @@
 #include "Arguments.hpp"
 
 #include "OS/Process/WaitableProcessGroup.hpp"
-#include "OS/Version/WinVersion.hpp"
 
 #include "Profiler/IETWBasedProfiler.hpp"
 

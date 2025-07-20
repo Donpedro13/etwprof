@@ -37,8 +37,7 @@ System requirements
 
 etwprof requires no 3rd party installations (no Visual Studio redistributable, no Windows SDK, etc.).
 
-At least Windows 7 is required for this program to operate. On Windows 7 specifically, etwprof will not work if the system is out of date (an update package is required that was released in 2013). There are individual features that might be unavailable or 
-limited on certain OS versions, see [Limitations and known issues](Documentation/Limitations_known_issues.md) for details.
+At least Windows 10 (TODO any specific version?) is required for this program to operate.
 
 Only 64-bit OSes are supported at this time (profiling of 32-bit *processes* a.k.a. WoW64 is supported, however).
 

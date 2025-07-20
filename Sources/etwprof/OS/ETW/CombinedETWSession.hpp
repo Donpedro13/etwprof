@@ -1,18 +1,21 @@
-#ifndef ETWP_NORMAL_ETW_SESSION_HPP
-#define ETWP_NORMAL_ETW_SESSION_HPP
-
-#include "ETWSessionInterfaces.hpp"
+#ifndef ETWP_WIN8_PLUS_KERNEL_SESSION_HPP
+#define ETWP_WIN8_PLUS_KERNEL_SESSION_HPP
 
 #include <memory>
 #include <string>
 
+#include "ETWSessionInterfaces.hpp"
+
 namespace ETWP {
 
-class NormalETWSession : public INormalETWSession {
+class CombinedETWSession : public IUserETWSession,
+                              public IKernelETWSession {
 public:
-    NormalETWSession (const std::wstring& name);
+    ETWP_DISABLE_COPY_AND_MOVE (CombinedETWSession);
 
-    virtual ~NormalETWSession () override;
+    CombinedETWSession (const std::wstring& name, ULONG kernelFlags);
+
+    virtual ~CombinedETWSession () override;
 
     virtual std::wstring GetName () const override;
 
@@ -29,9 +32,12 @@ public:
 
     virtual bool DisableProvider (LPCGUID pProviderID) override;
 
-private:
+    virtual ULONG GetKernelFlags () const override;
+
+protected:
     TRACEHANDLE                             m_handle;
     std::unique_ptr<EVENT_TRACE_PROPERTIES> m_properties;
+    ULONG                                   m_flags;
 
     std::wstring m_name;
     
@@ -40,4 +46,4 @@ private:
 
 }   // namespace ETWP
 
-#endif  // #ifndef ETWP_NORMAL_ETW_SESSION_HPP
+#endif  // #ifndef ETWP_WIN8_PLUS_KERNEL_SESSION_HPP

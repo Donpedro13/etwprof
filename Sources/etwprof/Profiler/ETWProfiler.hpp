@@ -9,7 +9,7 @@
 
 #include "IETWBasedProfiler.hpp"
 
-#include "OS/ETW/ETWSessionInterfaces.hpp"
+#include "OS/ETW/CombinedETWSession.hpp"
 
 #include "OS/Process/WaitableProcessGroup.hpp"
 #include "OS/Process/ProcessLifetimeObserver.hpp"
@@ -71,7 +71,7 @@ private:
     CriticalSection m_resultLock;   // Lock guarding m_result and m_errorFromWorkerThread
     HANDLE m_hWorkerThread;
 
-    std::unique_ptr<IKernelETWSession> m_ETWSession;
+    std::unique_ptr<CombinedETWSession> m_ETWSession;
 
     WaitableProcessGroup       m_originalTargets;
     WaitableProcessGroup       m_additionalTargets;

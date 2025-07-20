@@ -419,9 +419,6 @@ def test_compression_uncompressed():
 
 @testcase(suite = _profile_suite, name = "Stack caching", fixture = ProfileTestsFixture())
 def test_stack_caching():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("DoNothing", fixture.outfile, ["--scache"])
     assert(len(processes) == 1)
     process = processes[0]
@@ -449,9 +446,6 @@ def test_stack_caching():
 
 @testcase(suite = _profile_suite, name = "Multiple etwprofs at once", fixture = ProfileTestsFixture())
 def test_multiple_etwprofs_at_once():
-    if is_win7_or_earlier():
-        return  # Only one kernel session at once is supported on Win 7
-
     with PTHProcess() as pth,    \
          pth.get_event_for_sync() as e,          \
          EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile) as etwprof1, \
@@ -510,9 +504,6 @@ def test_multiple_etwprofs_at_once():
 
 @testcase(suite = _profile_suite, name = "No user providers", fixture = ProfileTestsFixture())
 def test_no_user_providers():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile)
 
     user_provider_etl_content_predicates = []
@@ -528,9 +519,6 @@ def test_no_user_providers():
     
 @testcase(suite = _profile_suite, name = "User providers, manifest-based", fixture = ProfileTestsFixture())
 def test_user_providers_mb_a():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [f"--enable={MB_A_GUID}"])
 
     expected_user_provider_event_counts = get_empty_user_provider_event_counts()
@@ -552,9 +540,6 @@ def test_user_providers_mb_a():
 
 @testcase(suite = _profile_suite, name = "User providers, TraceLogging", fixture = ProfileTestsFixture())
 def test_user_providers_tl_a():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [f"--enable={TL_A_GUID}"])
 
     expected_user_provider_event_counts = get_empty_user_provider_event_counts()
@@ -573,10 +558,7 @@ def test_user_providers_tl_a():
                                  additional_etl_content_predicates=user_provider_etl_content_predicates,
                                  sampled_profile_min=0)
     
-def _impl_test_user_providers_mb_b_tl_b(stacks: bool):
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-    
+def _impl_test_user_providers_mb_b_tl_b(stacks: bool):    
     enable_string = "--enable="
     if stacks:
         enable_string += f"{TL_B_GUID}::'stack'+{MB_B_GUID}::'stack'"
@@ -626,9 +608,6 @@ def test_user_providers_mb_b_tl_b_stacks():
 
 @testcase(suite = _profile_suite, name = "User providers, max. level", fixture = ProfileTestsFixture())
 def test_user_providers_all_max_level_1():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [get_enable_string_for_all_providers(max_level=1)])
 
     expected_user_provider_event_counts = get_empty_user_provider_event_counts()
@@ -650,9 +629,6 @@ def test_user_providers_all_max_level_1():
                                  sampled_profile_min=0)
     
 def _impl_every_user_providers_case(enable_string: str, expected_user_provider_event_counts):
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [enable_string])
 
     user_provider_etl_content_predicates = []
@@ -697,10 +673,7 @@ def test_user_providers_all_kw_220():
     _impl_every_user_providers_case(get_enable_string_for_all_providers(kw_bitmask_string="0x220"), expected_user_provider_event_counts)
     
 @testcase(suite = _profile_suite, name = "User providers, various providers and options", fixture = ProfileTestsFixture())
-def test_user_providers_all_kw_220():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-    
+def test_user_providers_all_kw_220():    
     enable_string = f"--enable={MB_A_GUID}:~0x1:'stack'+*TLA+{TL_B_GUID}:0x11:1"
 
     filelist, processes = perform_profile_test("MBTLEmitAll", fixture.outfile, [enable_string])
@@ -735,9 +708,6 @@ def test_user_providers_all_kw_220():
 
 @testcase(suite = _profile_suite, name = "User providers, multiple processes", fixture = ProfileTestsFixture())
 def test_user_providers_multiple_processes():
-    if is_win7_or_earlier():
-        return  # Not supported on Win 7
-
     pths = launch_pth_processes(3, "MBTLEmitAll")
 
     with EtwprofProcess.attach_to_profilee(PTH_EXE_NAME, fixture.outfile, [get_enable_string_for_all_providers()]) as etwprof:

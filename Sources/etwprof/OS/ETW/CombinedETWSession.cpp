@@ -1,4 +1,4 @@
-#include "NormalETWSession.hpp"
+#include "CombinedETWSession.hpp"
 
 #include <evntcons.h>
 
@@ -7,63 +7,63 @@
 
 namespace ETWP {
 
-NormalETWSession::NormalETWSession (const std::wstring& name):
+CombinedETWSession::CombinedETWSession (const std::wstring& name, ULONG kernelFlags):
     m_handle (NULL),
     m_properties (nullptr),
+    m_flags (kernelFlags),
     m_name (name),
     m_started (false)
 {
 
 }
 
-NormalETWSession::~NormalETWSession ()
+CombinedETWSession::~CombinedETWSession ()
 {
     if (m_started)
-        ETWP_VERIFY (StopETWSession (m_handle, m_name, m_properties.get ()));
+        StopETWSession (m_handle, m_name, m_properties.get ());
 }
 
-std::wstring NormalETWSession::GetName () const
+std::wstring CombinedETWSession::GetName () const
 {
     return m_name;
 }
 
-bool NormalETWSession::Start ()
+bool CombinedETWSession::Start ()
 {
     if (ETWP_ERROR (m_started))
         return true;
 
+    // On Windows 8 and later, there can be more than one kernel logger, and with custom session names (but an extra
+    //   flag, EVENT_TRACE_SYSTEM_LOGGER_MODE has to be present; yeah, not that it took me days to figure that out...)
     m_started = StartRealTimeETWSession (m_name,
-                                 EVENT_TRACE_REAL_TIME_MODE,
-                                 0,
-                                 &m_handle,
-                                 &m_properties);
+                                         EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE,
+                                         m_flags,
+                                         &m_handle,
+                                         &m_properties);
 
     return m_started;
 }
 
-bool NormalETWSession::Stop ()
+bool CombinedETWSession::Stop ()
 {
     if (ETWP_ERROR (!m_started))
         return true;
 
-    bool success = ControlTraceW (m_handle, m_name.c_str (), m_properties.get (), EVENT_TRACE_CONTROL_STOP) ==
-        ERROR_SUCCESS;
+    m_started = !StopETWSession (m_handle, m_name, m_properties.get ());
 
-    m_started = !success;
-
-    return success;
+    return !m_started;
 }
 
-TRACEHANDLE NormalETWSession::GetNativeHandle () const
+TRACEHANDLE CombinedETWSession::GetNativeHandle () const
 {
     return m_handle;
 }
 
-bool NormalETWSession::EnableProvider (LPCGUID pProviderID,
-                                       bool collectStacks,
-                                       UCHAR level /*= TRACE_LEVEL_VERBOSE*/,
-                                       ULONGLONG mathcAnyKeyword /*= 0*/,
-                                       ULONGLONG mathcAllKeyword /*= 0*/)
+bool CombinedETWSession::EnableProvider (LPCGUID pProviderID,
+                                            bool collectStacks,
+                                            UCHAR level /*= TRACE_LEVEL_VERBOSE*/,
+                                            ULONGLONG mathcAnyKeyword /*= 0*/,
+                                            ULONGLONG mathcAllKeyword /*= 0*/)
 {
     ENABLE_TRACE_PARAMETERS traceParams = {};
     traceParams.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
@@ -82,7 +82,7 @@ bool NormalETWSession::EnableProvider (LPCGUID pProviderID,
                            &traceParams) == ERROR_SUCCESS;
 }
 
-bool NormalETWSession::DisableProvider (LPCGUID pProviderID)
+bool CombinedETWSession::DisableProvider (LPCGUID pProviderID)
 {
     ENABLE_TRACE_PARAMETERS traceParams = {};
     traceParams.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
@@ -99,6 +99,11 @@ bool NormalETWSession::DisableProvider (LPCGUID pProviderID)
                            0,
                            0,
                            &traceParams) == ERROR_SUCCESS;
+}
+
+ULONG CombinedETWSession::GetKernelFlags () const
+{
+    return m_flags;
 }
 
 }   // namespace ETWP

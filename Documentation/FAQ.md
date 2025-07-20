@@ -17,10 +17,7 @@ __Q:__ __Why does etwprof need administrative privileges?__
 __A:__ A so-called ETW kernel session is required for collecting sampled profile data. In order to create and control a kernel session, you have to run as an administrator.
 
 __Q:__ __Requiring administrative privileges violates the design goal of being used as a support tool. What if an end user's account is not an admin (e.g. enterprise environments)?__  
-__A:__ You are right. However, a kernel ETW session requires administrative privileges, there is no way around that. Not using ETW would violate other design goals, so we have to live with this. If an end user's account is not an admin, he/she should reach out to the IT department for assistance (asking for over-the-shoulder elevation). 
-
-__Q:__ __Profiling fails with a message complaining about the failure of creating some `TraceRelogger` instance. What's the problem?__  
-__A:__ If you are on Windows 7, this probably means that your system is out of date. Install updates, or alternatively, install the required update package manually (see [Limitations and known issues](./Limitations_known_issues.md) for details).
+__A:__ You are right. However, a kernel ETW session requires administrative privileges, there is no way around that. Not using ETW would violate other design goals, so we have to live with this. If an end user's account is not an admin, he/she should reach out to the IT department for assistance (asking for over-the-shoulder elevation).
 
 __Q:__ __When I open the result trace with [WPA](https://docs.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-analyzer), it displays a lengthy warning dialog about dropped events. What's up with this?__  
 __A:__ The real-time ETW kernel session etwprof uses generates events on the fly, and the system stores them in buffers. These buffers are flushed to the `.etl` file, however, if events are generated more quickly than they can be flushed, they might be discarded (dropped). If you encounter this warning, your trace might be unfit for analysis (depending on the type and number of lost events).

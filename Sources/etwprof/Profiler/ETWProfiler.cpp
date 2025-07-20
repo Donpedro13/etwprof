@@ -9,10 +9,8 @@
 
 #include "OS/ETW/ETWConstants.hpp"
 #include "OS/ETW/ETWSessionCommon.hpp"
-#include "OS/ETW/NormalETWSession.hpp"
 #include "OS/ETW/TraceRelogger.hpp"
-#include "OS/ETW/Win7KernelSession.hpp"
-#include "OS/ETW/Win8PlusKernelSession.hpp"
+#include "OS/ETW/CombinedETWSession.hpp"
 
 #include "OS/FileSystem/Utility.hpp"
 
@@ -20,8 +18,6 @@
 #include "OS/Process/Utility.hpp"
 
 #include "OS/Synchronization/LockableGuard.hpp"
-
-#include "OS/Version/WinVersion.hpp"
 
 #include "ProfilerCommon.hpp"
 
@@ -66,9 +62,6 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
         }
     }
 
-    if (m_options & StackCache && GetWinVersion() < BaseWinVersion::Win8)
-		throw InitException (L"ETW stack caching is requested, but Windows version is less than 8!");
-
     // In order to be able to create a kernel logger session, we need administrative privileges
     if (!IsProcessElevated ()) {
         throw InitException (L"Process is not elevated! For ETW profiling, you need to run this program as "
@@ -94,10 +87,7 @@ ETWProfiler::ETWProfiler (const std::wstring& outputPath,
     if (m_options & RecordCSwitches)
         kProfilingFlags |= EVENT_TRACE_FLAG_CSWITCH | EVENT_TRACE_FLAG_DISPATCHER;
 
-    if (GetWinVersion () >= BaseWinVersion::Win8)
-        m_ETWSession.reset (new Win8PlusKernelSession (GenerateETWSessionName (), kProfilingFlags));
-    else
-        m_ETWSession.reset (new Win7KernelSession (kProfilingFlags));
+    m_ETWSession.reset (new CombinedETWSession (GenerateETWSessionName (), kProfilingFlags));
 
     Log (LogSeverity::Debug, L"ETW session name of profiler will be: " + m_ETWSession->GetName ());
 }
@@ -305,12 +295,6 @@ void ETWProfiler::Profile ()
                                      bool (m_options & RecordCSwitches),
                                      bool (m_options & ProfileChildren) };
 
-	if (GetWinVersion () < BaseWinVersion::Win8 && !filterData.userProviders.empty ()) {
-		SetErrorFromWorkerThread (L"User providers are requested, but Windows version is less than 8!");
-
-		return;
-	}
-
     // These will be used later, we create a copy as well (so no locking will be required)
     std::wstring outputPath = m_outputPath;
     std::wstring rawOutputPath = m_outputPath + L".raw.etl";
@@ -361,9 +345,8 @@ void ETWProfiler::Profile ()
             return;
         }
 
-        INormalETWSession* pNormalSession = dynamic_cast<INormalETWSession*> (m_ETWSession.get ());
         for (auto&& providerInfo : filterData.userProviders) {
-            if (ETWP_ERROR (!pNormalSession->EnableProvider (&providerInfo.providerID,
+            if (ETWP_ERROR (!m_ETWSession->EnableProvider (&providerInfo.providerID,
                                                              providerInfo.stack,
                                                              providerInfo.level,
                                                              providerInfo.flags)))
