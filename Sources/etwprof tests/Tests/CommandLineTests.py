@@ -27,6 +27,10 @@ def test_help_short():
     expect_zero(_run_command_line_test(["-h"]))
     expect_zero(_run_command_line_test(["--help"]))
 
+@testcase(suite = _cmd_suite, name = "Version")
+def test_version():
+    expect_zero(_run_command_line_test(["--version"]))
+
 @testcase(suite = _cmd_suite, name = "Unknown commands")
 def test_unknown_commands():
     expect_nonzero(_run_command_line_test(["hello"]))

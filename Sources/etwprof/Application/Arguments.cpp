@@ -249,9 +249,13 @@ bool ParseLongNonAssignmentArg (const std::wstring& arg, ApplicationRawArguments
     ETWP_ASSERT (!IsAssignmentArg (arg));
 
     std::wstring argName = GetArgName (arg);
-    // --help ; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache ; --noaction ; --children
+    // --help ; --version; --verbose ; --nologo ; --debug ; --cswitch ; --mdump ; --scache ; --noaction ; --children
     if (argName == L"help") {
         pArgumentsOut->help = true;
+
+        return true;
+    } else if (argName == L"version") {
+        pArgumentsOut->version = true;
 
         return true;
     } else if (argName == L"verbose") {
@@ -1004,6 +1008,7 @@ bool SemaArguments (const ApplicationRawArguments& parsedArgs, ApplicationArgume
     pArgumentsOut->noLogo = parsedArgs.noLogo;
     pArgumentsOut->verbose = parsedArgs.verbose;
     pArgumentsOut->help = parsedArgs.help;
+    pArgumentsOut->version = parsedArgs.version;
     pArgumentsOut->debug = parsedArgs.debug;
     pArgumentsOut->profileChildren = parsedArgs.profileChildren;
     pArgumentsOut->waitForChildren = parsedArgs.waitForChildren;

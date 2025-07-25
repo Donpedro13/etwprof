@@ -11,6 +11,7 @@ etwprof
     etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]] -- <process_path> [<process_args>...]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
+    etwprof --version
 
   Options:
     -h --help        Show this screen
@@ -19,6 +20,7 @@ etwprof
     -o --output=<o>  Output file path
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
+    --version        Show version information
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --children       Profile child processes, as well
     --waitchildren   Profiling waits for child processes as well, transitively

@@ -42,6 +42,8 @@ private:
     bool CheckWinVersion () const;
 
     void PrintUsage () const;
+	void PrintVersion () const;
+	void PrintVersionVerbose () const;
     void PrintLogo () const;
 
     // Commands

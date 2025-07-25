@@ -155,6 +155,12 @@ int Application::Run ()
     if (m_args.debug)
         SetMinLogSeverity (LogSeverity::Debug);
 
+    if (m_args.version) {
+        PrintVersionVerbose();
+
+        return 0;
+    }
+
     if (!m_args.noLogo)
         PrintLogo ();
 
@@ -201,6 +207,7 @@ void Application::PrintUsage () const
     etwprof profile (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--rate=<profile_rate>] [--nologo] [--verbose] [--debug] [--scache] [--children [--waitchildren]] -- <process_path> [<process_args>...]
     etwprof profile --emulate=<ETL_path> --target=<PID> (--output=<file_path> | --outdir=<dir_path>) [--compress=<mode>] [--enable=<args>] [--cswitch] [--nologo] [--verbose] [--debug] [--children]
     etwprof --help
+    etwprof --version
 
   Options:
     -h --help        Show this screen
@@ -209,6 +216,7 @@ void Application::PrintUsage () const
     -o --output=<o>  Output file path
     -d --debug       Turn on debug mode (even more verbose logging, preserve intermediate files, etc.)
     -m --mdump       Write a minidump of the target process(es) at the start of profiling
+    --version        Show version information
     --mflags=<f>     Dump type flags for minidump creation in hex format [default: 0x0 aka. MiniDumpNormal]
     --children       Profile child processes, as well
     --waitchildren   Profiling waits for child processes as well, transitively
@@ -225,7 +233,7 @@ void Application::PrintUsage () const
     COut () << kUsageString;
 }
 
-void Application::PrintLogo () const
+void Application::PrintVersion () const
 {
     COut () << ColorReset << L"etwprof\tVersion "
         ETWP_EXPAND_AND_STRINGIFY_WIDE (ETWP_MAJOR_VERSION) L"."
@@ -247,6 +255,34 @@ void Application::PrintLogo () const
             FgColorYellow << L"]" << ColorReset
 #endif  // #ifdef ETWP_DEBUG
         << L" - " << FgColorWhite << L"https://github.com/Donpedro13/etwprof" << ColorReset << Endl;
+}
+
+void Application::PrintVersionVerbose () const
+{
+    PrintVersion ();
+
+    COut() << Endl;
+    COut() << L"git revision:\t" << ETWP_GIT_COMMIT_HASH;
+    const std::wstring gitRevName = ETWP_GIT_REV_NAME;
+    if (!gitRevName.empty())
+        COut() << L", " << gitRevName;
+
+    COut() << Endl;
+
+    COut() << L"Build date:\t" << ETWP_WIDEN (__DATE__)<< Endl;
+
+    COut() << L"Built with:\t" <<
+#ifdef _MSC_VER
+        L"MSVC " << ETWP_EXPAND_AND_STRINGIFY_WIDE(_MSC_VER) << L" (" << ETWP_EXPAND_AND_STRINGIFY_WIDE(_MSC_FULL_VER) << L")" << Endl;
+#else
+#error "Unsupported compiler!"
+#endif
+    COut() << L"Build config:\t" << ETWP_BUILD_CONFIG << Endl;
+}
+
+void Application::PrintLogo () const
+{
+	PrintVersion ();
 
     COut () << L"Copyright (c) 2025 " << FgColorWhite << L"P\u00E9ter \u00C9sik" <<
         ColorReset << L" - " << FgColorWhite << L"https://peteronprogramming.wordpress.com/" << ColorReset << Endl;

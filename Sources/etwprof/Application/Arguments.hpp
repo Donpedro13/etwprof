@@ -15,6 +15,7 @@ struct ApplicationRawArguments {
     bool profile = false;
     bool noLogo = false;
     bool help = false;
+	bool version = false;
     bool outputFile = false;
     bool outputDir = false;
     bool samplingRate = false;
@@ -73,6 +74,7 @@ struct ApplicationArguments {
     bool profile = false;
     bool noLogo = false;
     bool verbose = false;
+    bool version = false;
     bool help = false;
     bool outputIsFile = false;
     bool targetIsPID = false;
